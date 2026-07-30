@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "../../Desktop/16BMB_March_2026/e290730-Gulick/US/V1/Images"
+		}
+	],
+	"settings": {
+		"powershell.cwd": "vCIJ_tests"
+	}
+}
