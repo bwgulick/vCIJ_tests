@@ -1,0 +1,243 @@
+Summary	U3	F	UNCERTAINTY ROLLUP  (1-sigma, GPa)
+Summary	U4	F	Quantity
+Summary	V4	F	value
+Summary	W4	F	sig_fit
+Summary	X4	F	sig_scatter
+Summary	Y4	F	sig_total(+/-)
+Summary	U5	F	C11
+Summary	V5	F	=M4
+Summary	W5	F	=SQRT(SUMSQ('No Vs 111'!GT70,'No Vp 111'!GT70,'No Vs 100'!GT70,'No Vp 100'!GT70,'No Vs 111'!GT44,'No Vp 111'!GT44,'No Vs 100'!GT44,'No Vp 100'!GT44))/8
+Summary	X5	F	=STDEV(B4:I4)/SQRT(8)
+Summary	Y5	F	=SQRT(W5^2+X5^2)
+Summary	U6	F	C12
+Summary	V6	F	=M5
+Summary	W6	F	=SQRT(SUMSQ('No Vs 111'!GT71,'No Vp 111'!GT71,'No Vs 100'!GT71,'No Vp 100'!GT71,'No Vs 111'!GT45,'No Vp 111'!GT45,'No Vs 100'!GT45,'No Vp 100'!GT45))/8
+Summary	X6	F	=STDEV(B5:I5)/SQRT(8)
+Summary	Y6	F	=SQRT(W6^2+X6^2)
+Summary	U7	F	C44
+Summary	V7	F	=M6
+Summary	W7	F	=SQRT(SUMSQ('No Vs 111'!GT72,'No Vp 111'!GT72,'No Vs 100'!GT72,'No Vp 100'!GT72,'No Vs 111'!GT46,'No Vp 111'!GT46,'No Vs 100'!GT46,'No Vp 100'!GT46))/8
+Summary	X7	F	=STDEV(B6:I6)/SQRT(8)
+Summary	Y7	F	=SQRT(W7^2+X7^2)
+Summary	U8	F	C11'
+Summary	V8	F	=M7
+Summary	W8	F	=SQRT(SUMSQ('No Vs 111'!GT73,'No Vp 111'!GT73,'No Vs 100'!GT73,'No Vp 100'!GT73,'No Vs 111'!GT47,'No Vp 111'!GT47,'No Vs 100'!GT47,'No Vp 100'!GT47))/8
+Summary	X8	F	=STDEV(B7:I7)/SQRT(8)
+Summary	Y8	F	=SQRT(W8^2+X8^2)
+Summary	U9	F	C12'
+Summary	V9	F	=M8
+Summary	W9	F	=SQRT(SUMSQ('No Vs 111'!GT74,'No Vp 111'!GT74,'No Vs 100'!GT74,'No Vp 100'!GT74,'No Vs 111'!GT48,'No Vp 111'!GT48,'No Vs 100'!GT48,'No Vp 100'!GT48))/8
+Summary	X9	F	=STDEV(B8:I8)/SQRT(8)
+Summary	Y9	F	=SQRT(W9^2+X9^2)
+Summary	U10	F	C44'
+Summary	V10	F	=M9
+Summary	W10	F	=SQRT(SUMSQ('No Vs 111'!GT75,'No Vp 111'!GT75,'No Vs 100'!GT75,'No Vp 100'!GT75,'No Vs 111'!GT49,'No Vp 111'!GT49,'No Vs 100'!GT49,'No Vp 100'!GT49))/8
+Summary	X10	F	=STDEV(B9:I9)/SQRT(8)
+Summary	Y10	F	=SQRT(W10^2+X10^2)
+Summary	AA5	F	K0 per combo
+Summary	AA6	F	GV0 per combo
+Summary	AA7	F	GR0 per combo
+Summary	AA8	F	GH0 per combo
+Summary	AB5	F	=(B4+2*B5)/3
+Summary	AB6	F	=(B4-B5+3*B6)/5
+Summary	AB7	F	=5*(B4-B5)*B6/(3*(B4-B5)+4*B6)
+Summary	AB8	F	=(AB6+AB7)/2
+Summary	AC5	F	=(C4+2*C5)/3
+Summary	AC6	F	=(C4-C5+3*C6)/5
+Summary	AC7	F	=5*(C4-C5)*C6/(3*(C4-C5)+4*C6)
+Summary	AC8	F	=(AC6+AC7)/2
+Summary	AD5	F	=(D4+2*D5)/3
+Summary	AD6	F	=(D4-D5+3*D6)/5
+Summary	AD7	F	=5*(D4-D5)*D6/(3*(D4-D5)+4*D6)
+Summary	AD8	F	=(AD6+AD7)/2
+Summary	AE5	F	=(E4+2*E5)/3
+Summary	AE6	F	=(E4-E5+3*E6)/5
+Summary	AE7	F	=5*(E4-E5)*E6/(3*(E4-E5)+4*E6)
+Summary	AE8	F	=(AE6+AE7)/2
+Summary	AF5	F	=(F4+2*F5)/3
+Summary	AF6	F	=(F4-F5+3*F6)/5
+Summary	AF7	F	=5*(F4-F5)*F6/(3*(F4-F5)+4*F6)
+Summary	AF8	F	=(AF6+AF7)/2
+Summary	AG5	F	=(G4+2*G5)/3
+Summary	AG6	F	=(G4-G5+3*G6)/5
+Summary	AG7	F	=5*(G4-G5)*G6/(3*(G4-G5)+4*G6)
+Summary	AG8	F	=(AG6+AG7)/2
+Summary	AH5	F	=(H4+2*H5)/3
+Summary	AH6	F	=(H4-H5+3*H6)/5
+Summary	AH7	F	=5*(H4-H5)*H6/(3*(H4-H5)+4*H6)
+Summary	AH8	F	=(AH6+AH7)/2
+Summary	AI5	F	=(I4+2*I5)/3
+Summary	AI6	F	=(I4-I5+3*I6)/5
+Summary	AI7	F	=5*(I4-I5)*I6/(3*(I4-I5)+4*I6)
+Summary	AI8	F	=(AI6+AI7)/2
+Summary	U11	F	K0
+Summary	V11	F	=(M4+2*M5)/3
+Summary	W11	F	=SQRT(SUMSQ('No Vs 111'!GS80,'No Vp 111'!GS80,'No Vs 100'!GS80,'No Vp 100'!GS80,'No Vs 111'!GS54,'No Vp 111'!GS54,'No Vs 100'!GS54,'No Vp 100'!GS54))/8
+Summary	X11	F	=STDEV(AB5:AI5)/SQRT(8)
+Summary	Y11	F	=SQRT(W11^2+X11^2)
+Summary	U12	F	GV0
+Summary	V12	F	=(M4-M5+3*M6)/5
+Summary	W12	F	=SQRT(SUMSQ('No Vs 111'!GS81,'No Vp 111'!GS81,'No Vs 100'!GS81,'No Vp 100'!GS81,'No Vs 111'!GS55,'No Vp 111'!GS55,'No Vs 100'!GS55,'No Vp 100'!GS55))/8
+Summary	X12	F	=STDEV(AB6:AI6)/SQRT(8)
+Summary	Y12	F	=SQRT(W12^2+X12^2)
+Summary	U13	F	GR0
+Summary	V13	F	=5*(M4-M5)*M6/(3*(M4-M5)+4*M6)
+Summary	W13	F	=SQRT(SUMSQ('No Vs 111'!GS82,'No Vp 111'!GS82,'No Vs 100'!GS82,'No Vp 100'!GS82,'No Vs 111'!GS56,'No Vp 111'!GS56,'No Vs 100'!GS56,'No Vp 100'!GS56))/8
+Summary	X13	F	=STDEV(AB7:AI7)/SQRT(8)
+Summary	Y13	F	=SQRT(W13^2+X13^2)
+Summary	U14	F	GH0
+Summary	V14	F	=(V12+V13)/2
+Summary	W14	F	=SQRT(SUMSQ('No Vs 111'!GS83,'No Vp 111'!GS83,'No Vs 100'!GS83,'No Vp 100'!GS83,'No Vs 111'!GS57,'No Vp 111'!GS57,'No Vs 100'!GS57,'No Vp 100'!GS57))/8
+Summary	X14	F	=STDEV(AB8:AI8)/SQRT(8)
+Summary	Y14	F	=SQRT(W14^2+X14^2)
+Summary	U16	F	NOTE: sig_fit=sqrt(sum SE^2)/8 (8 combos: 4 FS+4 CK); sig_scatter=STDEV/sqrt(8); value=all-combo mean. FS&CK on a sheet share data (correlated) so scatter is the robust term. Re-run _solveraid.ps1 after any re-fit. Helper table to the right.
+GLOBAL Summary	S2	F	UNCERTAINTY ROLLUP  (1-sigma, GPa)
+GLOBAL Summary	S3	F	Quantity
+GLOBAL Summary	T3	F	value
+GLOBAL Summary	U3	F	sig_fit
+GLOBAL Summary	V3	F	sig_scatter
+GLOBAL Summary	W3	F	sig_total(+/-)
+GLOBAL Summary	S4	F	C11
+GLOBAL Summary	T4	F	=M2
+GLOBAL Summary	U4	F	=SQRT(SUMSQ('Global No Vs 111'!GT70,'Global No Vp 111'!GT70,'Global No Vs 100'!GT70,'Global No Vp 100'!GT70,'Global No Vs 111'!GT44,'Global No Vp 111'!GT44,'Global No Vs 100'!GT44,'Global No Vp 100'!GT44))/8
+GLOBAL Summary	V4	F	=STDEV(B2:I2)/SQRT(8)
+GLOBAL Summary	W4	F	=SQRT(U4^2+V4^2)
+GLOBAL Summary	S5	F	C12
+GLOBAL Summary	T5	F	=M3
+GLOBAL Summary	U5	F	=SQRT(SUMSQ('Global No Vs 111'!GT71,'Global No Vp 111'!GT71,'Global No Vs 100'!GT71,'Global No Vp 100'!GT71,'Global No Vs 111'!GT45,'Global No Vp 111'!GT45,'Global No Vs 100'!GT45,'Global No Vp 100'!GT45))/8
+GLOBAL Summary	V5	F	=STDEV(B3:I3)/SQRT(8)
+GLOBAL Summary	W5	F	=SQRT(U5^2+V5^2)
+GLOBAL Summary	S6	F	C44
+GLOBAL Summary	T6	F	=M4
+GLOBAL Summary	U6	F	=SQRT(SUMSQ('Global No Vs 111'!GT72,'Global No Vp 111'!GT72,'Global No Vs 100'!GT72,'Global No Vp 100'!GT72,'Global No Vs 111'!GT46,'Global No Vp 111'!GT46,'Global No Vs 100'!GT46,'Global No Vp 100'!GT46))/8
+GLOBAL Summary	V6	F	=STDEV(B4:I4)/SQRT(8)
+GLOBAL Summary	W6	F	=SQRT(U6^2+V6^2)
+GLOBAL Summary	S7	F	C11'
+GLOBAL Summary	T7	F	=M5
+GLOBAL Summary	U7	F	=SQRT(SUMSQ('Global No Vs 111'!GT73,'Global No Vp 111'!GT73,'Global No Vs 100'!GT73,'Global No Vp 100'!GT73,'Global No Vs 111'!GT47,'Global No Vp 111'!GT47,'Global No Vs 100'!GT47,'Global No Vp 100'!GT47))/8
+GLOBAL Summary	V7	F	=STDEV(B5:I5)/SQRT(8)
+GLOBAL Summary	W7	F	=SQRT(U7^2+V7^2)
+GLOBAL Summary	S8	F	C12'
+GLOBAL Summary	T8	F	=M6
+GLOBAL Summary	U8	F	=SQRT(SUMSQ('Global No Vs 111'!GT74,'Global No Vp 111'!GT74,'Global No Vs 100'!GT74,'Global No Vp 100'!GT74,'Global No Vs 111'!GT48,'Global No Vp 111'!GT48,'Global No Vs 100'!GT48,'Global No Vp 100'!GT48))/8
+GLOBAL Summary	V8	F	=STDEV(B6:I6)/SQRT(8)
+GLOBAL Summary	W8	F	=SQRT(U8^2+V8^2)
+GLOBAL Summary	S9	F	C44'
+GLOBAL Summary	T9	F	=M7
+GLOBAL Summary	U9	F	=SQRT(SUMSQ('Global No Vs 111'!GT75,'Global No Vp 111'!GT75,'Global No Vs 100'!GT75,'Global No Vp 100'!GT75,'Global No Vs 111'!GT49,'Global No Vp 111'!GT49,'Global No Vs 100'!GT49,'Global No Vp 100'!GT49))/8
+GLOBAL Summary	V9	F	=STDEV(B7:I7)/SQRT(8)
+GLOBAL Summary	W9	F	=SQRT(U9^2+V9^2)
+GLOBAL Summary	AA5	F	K0 per combo
+GLOBAL Summary	AA6	F	GV0 per combo
+GLOBAL Summary	AA7	F	GR0 per combo
+GLOBAL Summary	AA8	F	GH0 per combo
+GLOBAL Summary	AB5	F	=(B2+2*B3)/3
+GLOBAL Summary	AB6	F	=(B2-B3+3*B4)/5
+GLOBAL Summary	AB7	F	=5*(B2-B3)*B4/(3*(B2-B3)+4*B4)
+GLOBAL Summary	AB8	F	=(AB6+AB7)/2
+GLOBAL Summary	AC5	F	=(C2+2*C3)/3
+GLOBAL Summary	AC6	F	=(C2-C3+3*C4)/5
+GLOBAL Summary	AC7	F	=5*(C2-C3)*C4/(3*(C2-C3)+4*C4)
+GLOBAL Summary	AC8	F	=(AC6+AC7)/2
+GLOBAL Summary	AD5	F	=(D2+2*D3)/3
+GLOBAL Summary	AD6	F	=(D2-D3+3*D4)/5
+GLOBAL Summary	AD7	F	=5*(D2-D3)*D4/(3*(D2-D3)+4*D4)
+GLOBAL Summary	AD8	F	=(AD6+AD7)/2
+GLOBAL Summary	AE5	F	=(E2+2*E3)/3
+GLOBAL Summary	AE6	F	=(E2-E3+3*E4)/5
+GLOBAL Summary	AE7	F	=5*(E2-E3)*E4/(3*(E2-E3)+4*E4)
+GLOBAL Summary	AE8	F	=(AE6+AE7)/2
+GLOBAL Summary	AF5	F	=(F2+2*F3)/3
+GLOBAL Summary	AF6	F	=(F2-F3+3*F4)/5
+GLOBAL Summary	AF7	F	=5*(F2-F3)*F4/(3*(F2-F3)+4*F4)
+GLOBAL Summary	AF8	F	=(AF6+AF7)/2
+GLOBAL Summary	AG5	F	=(G2+2*G3)/3
+GLOBAL Summary	AG6	F	=(G2-G3+3*G4)/5
+GLOBAL Summary	AG7	F	=5*(G2-G3)*G4/(3*(G2-G3)+4*G4)
+GLOBAL Summary	AG8	F	=(AG6+AG7)/2
+GLOBAL Summary	AH5	F	=(H2+2*H3)/3
+GLOBAL Summary	AH6	F	=(H2-H3+3*H4)/5
+GLOBAL Summary	AH7	F	=5*(H2-H3)*H4/(3*(H2-H3)+4*H4)
+GLOBAL Summary	AH8	F	=(AH6+AH7)/2
+GLOBAL Summary	AI5	F	=(I2+2*I3)/3
+GLOBAL Summary	AI6	F	=(I2-I3+3*I4)/5
+GLOBAL Summary	AI7	F	=5*(I2-I3)*I4/(3*(I2-I3)+4*I4)
+GLOBAL Summary	AI8	F	=(AI6+AI7)/2
+GLOBAL Summary	S10	F	K0
+GLOBAL Summary	T10	F	=(M2+2*M3)/3
+GLOBAL Summary	U10	F	=SQRT(SUMSQ('Global No Vs 111'!GS80,'Global No Vp 111'!GS80,'Global No Vs 100'!GS80,'Global No Vp 100'!GS80,'Global No Vs 111'!GS54,'Global No Vp 111'!GS54,'Global No Vs 100'!GS54,'Global No Vp 100'!GS54))/8
+GLOBAL Summary	V10	F	=STDEV(AB5:AI5)/SQRT(8)
+GLOBAL Summary	W10	F	=SQRT(U10^2+V10^2)
+GLOBAL Summary	S11	F	GV0
+GLOBAL Summary	T11	F	=(M2-M3+3*M4)/5
+GLOBAL Summary	U11	F	=SQRT(SUMSQ('Global No Vs 111'!GS81,'Global No Vp 111'!GS81,'Global No Vs 100'!GS81,'Global No Vp 100'!GS81,'Global No Vs 111'!GS55,'Global No Vp 111'!GS55,'Global No Vs 100'!GS55,'Global No Vp 100'!GS55))/8
+GLOBAL Summary	V11	F	=STDEV(AB6:AI6)/SQRT(8)
+GLOBAL Summary	W11	F	=SQRT(U11^2+V11^2)
+GLOBAL Summary	S12	F	GR0
+GLOBAL Summary	T12	F	=5*(M2-M3)*M4/(3*(M2-M3)+4*M4)
+GLOBAL Summary	U12	F	=SQRT(SUMSQ('Global No Vs 111'!GS82,'Global No Vp 111'!GS82,'Global No Vs 100'!GS82,'Global No Vp 100'!GS82,'Global No Vs 111'!GS56,'Global No Vp 111'!GS56,'Global No Vs 100'!GS56,'Global No Vp 100'!GS56))/8
+GLOBAL Summary	V12	F	=STDEV(AB7:AI7)/SQRT(8)
+GLOBAL Summary	W12	F	=SQRT(U12^2+V12^2)
+GLOBAL Summary	S13	F	GH0
+GLOBAL Summary	T13	F	=(T11+T12)/2
+GLOBAL Summary	U13	F	=SQRT(SUMSQ('Global No Vs 111'!GS83,'Global No Vp 111'!GS83,'Global No Vs 100'!GS83,'Global No Vp 100'!GS83,'Global No Vs 111'!GS57,'Global No Vp 111'!GS57,'Global No Vs 100'!GS57,'Global No Vp 100'!GS57))/8
+GLOBAL Summary	V13	F	=STDEV(AB8:AI8)/SQRT(8)
+GLOBAL Summary	W13	F	=SQRT(U13^2+V13^2)
+GLOBAL Summary	S15	F	NOTE: sig_fit=sqrt(sum SE^2)/8 (8 combos: 4 FS+4 CK); sig_scatter=STDEV/sqrt(8); value=all-combo mean. FS&CK on a sheet share data (correlated) so scatter is the robust term. Re-run _solveraid.ps1 after any re-fit. Helper table to the right.
+Super Summary	X2	F	COMBINED FINAL (1-sigma, GPa)  <- from Summary & GLOBAL Summary rollups
+Super Summary	X3	F	Quantity
+Super Summary	Y3	F	Reg value
+Super Summary	Z3	F	Reg +/-
+Super Summary	AA3	F	Global value
+Super Summary	AB3	F	Global +/-
+Super Summary	X4	F	C11
+Super Summary	Y4	F	='Summary'!V5
+Super Summary	Z4	F	='Summary'!Y5
+Super Summary	AA4	F	='GLOBAL Summary'!T4
+Super Summary	AB4	F	='GLOBAL Summary'!W4
+Super Summary	X5	F	C12
+Super Summary	Y5	F	='Summary'!V6
+Super Summary	Z5	F	='Summary'!Y6
+Super Summary	AA5	F	='GLOBAL Summary'!T5
+Super Summary	AB5	F	='GLOBAL Summary'!W5
+Super Summary	X6	F	C44
+Super Summary	Y6	F	='Summary'!V7
+Super Summary	Z6	F	='Summary'!Y7
+Super Summary	AA6	F	='GLOBAL Summary'!T6
+Super Summary	AB6	F	='GLOBAL Summary'!W6
+Super Summary	X7	F	C11'
+Super Summary	Y7	F	='Summary'!V8
+Super Summary	Z7	F	='Summary'!Y8
+Super Summary	AA7	F	='GLOBAL Summary'!T7
+Super Summary	AB7	F	='GLOBAL Summary'!W7
+Super Summary	X8	F	C12'
+Super Summary	Y8	F	='Summary'!V9
+Super Summary	Z8	F	='Summary'!Y9
+Super Summary	AA8	F	='GLOBAL Summary'!T8
+Super Summary	AB8	F	='GLOBAL Summary'!W8
+Super Summary	X9	F	C44'
+Super Summary	Y9	F	='Summary'!V10
+Super Summary	Z9	F	='Summary'!Y10
+Super Summary	AA9	F	='GLOBAL Summary'!T9
+Super Summary	AB9	F	='GLOBAL Summary'!W9
+Super Summary	X10	F	K0
+Super Summary	Y10	F	='Summary'!V11
+Super Summary	Z10	F	='Summary'!Y11
+Super Summary	AA10	F	='GLOBAL Summary'!T10
+Super Summary	AB10	F	='GLOBAL Summary'!W10
+Super Summary	X11	F	GV0
+Super Summary	Y11	F	='Summary'!V12
+Super Summary	Z11	F	='Summary'!Y12
+Super Summary	AA11	F	='GLOBAL Summary'!T11
+Super Summary	AB11	F	='GLOBAL Summary'!W11
+Super Summary	X12	F	GR0
+Super Summary	Y12	F	='Summary'!V13
+Super Summary	Z12	F	='Summary'!Y13
+Super Summary	AA12	F	='GLOBAL Summary'!T12
+Super Summary	AB12	F	='GLOBAL Summary'!W12
+Super Summary	X13	F	GH0
+Super Summary	Y13	F	='Summary'!V14
+Super Summary	Z13	F	='Summary'!Y14
+Super Summary	AA13	F	='GLOBAL Summary'!T13
+Super Summary	AB13	F	='GLOBAL Summary'!W13
+Super Summary	X15	F	NOTE: Reg = mean of 8 per-pressure combo fits (4 FS+4 CK); Global = mean of 8 global fits. +/- combines fit SE and between-combo scatter. See Summary!U3 and 'GLOBAL Summary'!S2.
