@@ -19,31 +19,35 @@ from matplotlib.ticker import MaxNLocator
 
 import vplot_common as vc
 
-# (panel key, y-label, CK column, FS column, ncrt column, poly value col, poly ncrt col)
+# The legend uses the editable base tags in vc.LABEL verbatim (same three
+# entries for both panels), so the figure carries ONE combined legend of three
+# series rather than a per-panel "K CK / GVRH CK" set.
+#
+# (panel key, y-label, CK col, FS col, ncrt col, poly val col, poly ncrt col)
 PANELS = [
-    ("K",  "Bulk modulus $K$ (GPa)",        "K CK",  "K FS",  "ncrt K",
-     "Kpoly", "ncrt Kpoly", "$K_{poly}$"),
-    ("GH", "Shear modulus $G_H$ (GPa)",     "GH CK", "GH FS", "ncrt GH",
-     "Gpoly", "ncrt Gpoly", "$G_{poly}$"),
+    ("K",  "Bulk modulus $K$ (GPa)",    "K CK",  "K FS",  "ncrt K",
+     "Kpoly", "ncrt Kpoly"),
+    ("GH", "Shear modulus $G_H$ (GPa)", "GH CK", "GH FS", "ncrt GH",
+     "Gpoly", "ncrt Gpoly"),
 ]
 
 
-def _draw_panel(ax, df, ck_col, fs_col, ncrt_col, poly_col, poly_err, poly_label):
+def _draw_panel(ax, df, ck_col, fs_col, ncrt_col, poly_col, poly_err):
     # --- CK ---
     x, y, ye, xe = vc.series_xy(df, "P EXP", ck_col, yerrcol=ncrt_col, xerrcol="ncrt P")
-    vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
-                color=vc.COL["CK"], marker=vc.MARK["CK"], label="CK (Cook)")
+    vc.draw_pts(ax, x, y, yerr=ye, xerr=xe, color=vc.COL["CK"],
+                marker=vc.MARK["CK"], label=vc.LABEL["CK"])
 
     # --- FS ---
     x, y, ye, xe = vc.series_xy(df, "P FS", fs_col, yerrcol=ncrt_col, xerrcol="ncrt P")
-    vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
-                color=vc.COL["FS"], marker=vc.MARK["FS"], label="FS (finite strain)")
+    vc.draw_pts(ax, x, y, yerr=ye, xerr=xe, color=vc.COL["FS"],
+                marker=vc.MARK["FS"], label=vc.LABEL["FS"])
 
     # --- poly (Kpoly / Gpoly) at its own single pressure ---
     x, y, ye, xe = vc.series_xy(df, "Ppoly", poly_col,
                                 yerrcol=poly_err, xerrcol="ncrt Ppoly")
-    vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
-                color=vc.COL["poly"], marker=vc.MARK["poly"], label=poly_label)
+    vc.draw_pts(ax, x, y, yerr=ye, xerr=xe, color=vc.COL["poly"],
+                marker=vc.MARK["poly"], label=vc.LABEL["poly"])
 
     ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
     ax.margins(y=0.15)
@@ -57,11 +61,11 @@ def main(path=None, show=False):
         gridspec_kw={"hspace": 0.08},
     )
 
-    (k_key, k_ylab, k_ck, k_fs, k_ncrt, k_pcol, k_perr, k_plab) = PANELS[0]
-    (g_key, g_ylab, g_ck, g_fs, g_ncrt, g_pcol, g_perr, g_plab) = PANELS[1]
+    (k_key, k_ylab, k_ck, k_fs, k_ncrt, k_pcol, k_perr) = PANELS[0]
+    (g_key, g_ylab, g_ck, g_fs, g_ncrt, g_pcol, g_perr) = PANELS[1]
 
-    _draw_panel(ax1, df, k_ck, k_fs, k_ncrt, k_pcol, k_perr, k_plab)
-    _draw_panel(ax2, df, g_ck, g_fs, g_ncrt, g_pcol, g_perr, g_plab)
+    _draw_panel(ax1, df, k_ck, k_fs, k_ncrt, k_pcol, k_perr)
+    _draw_panel(ax2, df, g_ck, g_fs, g_ncrt, g_pcol, g_perr)
 
     ax1.set_ylabel(k_ylab, fontsize=12)
     ax2.set_ylabel(g_ylab, fontsize=12)
@@ -72,15 +76,20 @@ def main(path=None, show=False):
     vc.apply_ylim(ax2, g_key)
     vc.apply_xlim(ax2)
 
-    ax1.legend(fontsize=9, frameon=False, loc="upper left", ncol=3)
-    ax2.legend(fontsize=9, frameon=False, loc="upper left", ncol=3)
+    # single combined legend (both panels' series) on the top panel, matching
+    # the tri-plot.  Dedup by label so nothing repeats.
+    handles, labels = [], []
+    for ax in (ax1, ax2):
+        for h, l in zip(*ax.get_legend_handles_labels()):
+            if l not in labels:
+                handles.append(h); labels.append(l)
+    ax1.legend(handles, labels, fontsize=9, frameon=False,
+               loc="upper left", ncol=3)
 
     # clean interior spines/ticks (no diagonal break marks - K and G_H are
     # different quantities, not a single broken axis)
     vc.exterminate_ticks([ax1, ax2])
 
-    fig.suptitle("Vanadium aggregate moduli: CK vs FS with poly overlay",
-                 fontsize=13, y=0.93)
     out = vc.output_path("moduli_dual.png")
     fig.savefig(out, dpi=200, bbox_inches="tight")
     print(f"CK/FS/poly points -> {out}")

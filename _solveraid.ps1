@@ -1,5 +1,5 @@
 param(
-  [string]$Wb  = "C:\Users\bgulick\Downloads\vCIJ_tests\Cij analysis\Vanadium_Cij_Brian_Claude.xlsx",
+  [string]$Wb  = "C:\Users\bgulick\Downloads\vCIJ_tests\Cij analysis\V_Cij.xlsx",
   [string]$Log = "C:\Users\bgulick\Downloads\vCIJ_tests\_solveraid_log.txt"
 )
 $ErrorActionPreference = "Stop"
@@ -96,6 +96,14 @@ try {
     $gGH=@([double](($gGV[0]+$gGR[0])/2.0), [double](($gGV[1]+$gGR[1])/2.0), [double](($gGV[2]+$gGR[2])/2.0))
     $sK=QF $gK $S3; $sGV=QF $gGV $S3; $sGR=QF $gGR $S3; $sGH=QF $gGH $S3
 
+    # --- pressure-derivative sigmas (ambient dCij/dP fit params C11',C12',C44' = indices 3,4,5) ---
+    # Reuse the SAME gradient vectors: K'=(C11'+2C12')/3, GV'=(C11'-C12'+3C44')/5,
+    # GR'=(20c^2/D^2)(C11'-C12')+(15Dif^2/D^2)C44' (gGR coeffs at ambient moduli), GVRH'=(GV'+GR')/2.
+    # Propagate through the 3x3 covariance block of the DERIVATIVE params (correlations included).
+    $S3p=[double[]]::new(9)
+    for($a=0;$a -lt 3;$a++){ for($b=0;$b -lt 3;$b++){ $S3p[$a*3+$b]=$Cov[($a+3)*$p+($b+3)] } }
+    $sKp=QF $gK $S3p; $sGVp=QF $gGV $S3p; $sGRp=QF $gGR $S3p; $sGHp=QF $gGH $S3p
+
     # write per-cell: text via .Formula, numbers via .Value2 (separate COM properties -> no binder clash)
     $r0row=[int]$cfg.Row; $c0=[int]$ANCHORCOL
     $L0=ColLetter $c0; $L1=ColLetter ($c0+1); $L2=ColLetter ($c0+2)
@@ -113,12 +121,18 @@ try {
     $r=$rf+5; $sh.Range("$L0$r").Formula="sigma(GV0)"; $sh.Range("$L1$r").Value2=[double]$sGV
     $r=$rf+6; $sh.Range("$L0$r").Formula="sigma(GR0)"; $sh.Range("$L1$r").Value2=[double]$sGR
     $r=$rf+7; $sh.Range("$L0$r").Formula="sigma(GH0)"; $sh.Range("$L1$r").Value2=[double]$sGH
+    # derivative sigmas, side-by-side with ambient ones (label col GU=c0+3, value col GV=c0+4)
+    $Ld0=ColLetter ($c0+3); $Ld1=ColLetter ($c0+4)
+    $r=$rf+4; $sh.Range("$Ld0$r").Formula="sigma(K0')";   $sh.Range("$Ld1$r").Value2=[double]$sKp
+    $r=$rf+5; $sh.Range("$Ld0$r").Formula="sigma(GV0')";  $sh.Range("$Ld1$r").Value2=[double]$sGVp
+    $r=$rf+6; $sh.Range("$Ld0$r").Formula="sigma(GR0')";  $sh.Range("$Ld1$r").Value2=[double]$sGRp
+    $r=$rf+7; $sh.Range("$Ld0$r").Formula="sigma(GVRH')"; $sh.Range("$Ld1$r").Value2=[double]$sGHp
     $mrow=$rf+9
     $sh.Range("$L0$mrow").Formula="Cov(theta) 6x6:"
     for($a=0;$a -lt 6;$a++){ $rr=$mrow+1+$a; for($b=0;$b -lt 6;$b++){ $cl=ColLetter ($c0+$b); $sh.Range("$cl$rr").Value2=[double]$Cov[$a*$p+$b] } }
     $nr=$mrow+8; $sh.Range("$L0$nr").Formula="NOTE: SEs valid at current converged params; recompute after any re-fit."
 
-    $ln=("{0,-11} {1}: SSR={2:E4} dof={3} RMS={4:F5} | SE C11={5:F4} C12={6:F4} C44={7:F4} | sK={8:F4} sGV={9:F4} sGR={10:F4} sGH={11:F4}" -f $cfg.Sheet,$cfg.Fit,$SSR,$dof,$rms,$SE[0],$SE[1],$SE[2],$sK,$sGV,$sGR,$sGH)
+    $ln=("{0,-11} {1}: SSR={2:E4} dof={3} RMS={4:F5} | SE C11={5:F4} C12={6:F4} C44={7:F4} | sK={8:F4} sGV={9:F4} sGR={10:F4} sGH={11:F4} | SE C11'={12:F4} C12'={13:F4} C44'={14:F4} sK'={15:F4} sGVRH'={16:F4}" -f $cfg.Sheet,$cfg.Fit,$SSR,$dof,$rms,$SE[0],$SE[1],$SE[2],$sK,$sGV,$sGR,$sGH,$SE[3],$SE[4],$SE[5],$sKp,$sGHp)
     [void]$logLines.Add($ln); Write-Output $ln
   }
   $xl.Calculation=-4105; $book.Application.CalculateFull(); $book.Save(); $book.Close($true)

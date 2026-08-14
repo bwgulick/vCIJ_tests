@@ -56,7 +56,7 @@ MARK = {"CK": "o", "FS": "s", "poly": "D"}
 # tri-plot uses them verbatim.  The GUI writes chosen names into LABEL
 # before each render, so renaming a series updates every legend.
 # ----------------------------------------------------------------------
-LABEL = {"CK": "CK", "FS": "FS", "poly": "PC"}
+LABEL = {"CK": "Cook", "FS": "Finite strain", "poly": "Gulick et al. 2025"}
 
 # ----------------------------------------------------------------------
 # Ready-made colour-blind-friendly palettes (CK, FS, poly).  All chosen to

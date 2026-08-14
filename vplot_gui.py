@@ -3,7 +3,8 @@ Tkinter GUI wrapping the vanadium figures (Cij tri-plot, moduli dual-plot).
 
     - pick which figure to build
     - choose the source .xlsx (defaults to VCIJplotdata.xlsx)
-    - set the colour AND marker shape of each series (CK / FS / poly):
+    - set the legend name, colour AND marker shape of each series (CK / FS / poly):
+        * an editable legend-name box per series
         * a preset colour-blind-safe palette dropdown, or
         * a per-series colour wheel + hex box (accepts hex or matplotlib names)
         * a per-series marker-shape dropdown
@@ -55,7 +56,7 @@ class VPlotApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Vanadium elastic-property plotter")
-        self.geometry("960x960")
+        self.geometry("1040x960")
         self.current_fig = None
         self.canvas = None
         self.toolbar = None
@@ -63,6 +64,7 @@ class VPlotApp(tk.Tk):
         # live per-series style, seeded from the module defaults
         self.colors = dict(vc.COL)
         self.markers = dict(vc.MARK)
+        self.names = dict(vc.LABEL)   # editable legend tags (CK / FS / PC)
         # error-bar visibility toggles (all-vertical / all-horizontal)
         self.show_yerr = tk.BooleanVar(value=vc.SHOW_YERR)
         self.show_xerr = tk.BooleanVar(value=vc.SHOW_XERR)
@@ -70,15 +72,31 @@ class VPlotApp(tk.Tk):
         self.hexvars = {}
         self.swatches = {}
         self.markvars = {}
+        self.namevars = {}
         # axis-bounds state (see _build_bounds_panel)
         self.bound_vars = {}     # "x" / panel key -> (lo StringVar, hi StringVar)
         self.bound_store = {}    # key -> [lo str, hi str], kept across figure switches
 
         self._build_controls()
-        self._build_style_panel()
-        self._build_display_panel()
-        self._build_bounds_panel()
+        self._build_settings_row()
         self._build_canvas_area()
+
+    # ------------------------------------------------------------------
+    # settings row: series style (left) beside axis bounds + error bars
+    # (right), so the controls stay short and the figure gets the height.
+    # ------------------------------------------------------------------
+    def _build_settings_row(self):
+        row = ttk.Frame(self, padding=(8, 0))
+        row.pack(side=tk.TOP, fill=tk.X)
+
+        left = ttk.Frame(row)
+        left.pack(side=tk.LEFT, anchor="n")
+        right = ttk.Frame(row)
+        right.pack(side=tk.LEFT, anchor="n", fill=tk.X, expand=True, padx=(8, 0))
+
+        self._build_style_panel(left)
+        self._build_bounds_panel(right)
+        self._build_display_panel(right)
 
     # ------------------------------------------------------------------
     def _build_controls(self):
@@ -111,9 +129,9 @@ class VPlotApp(tk.Tk):
         ttk.Label(self, textvariable=self.status, relief=tk.SUNKEN,
                   anchor=tk.W).pack(side=tk.BOTTOM, fill=tk.X)
 
-    def _build_style_panel(self):
-        box = ttk.LabelFrame(self, text="Series style (colour + marker)", padding=8)
-        box.pack(side=tk.TOP, fill=tk.X, padx=8, pady=(0, 6))
+    def _build_style_panel(self, parent):
+        box = ttk.LabelFrame(parent, text="Series style (colour + marker)", padding=8)
+        box.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
 
         # preset palette row
         prow = ttk.Frame(box)
@@ -126,21 +144,30 @@ class VPlotApp(tk.Tk):
         pcb.bind("<<ComboboxSelected>>", self._apply_palette)
 
         # column headers
-        for c, txt in enumerate(("Series", "Colour", "Hex / name", "Marker")):
+        for c, txt in enumerate(
+                ("Series", "Legend name", "Colour", "Hex / name", "Marker")):
             ttk.Label(box, text=txt).grid(row=1, column=c, padx=6, sticky="w")
 
         # one row per series
         for i, (key, label) in enumerate(SERIES, start=2):
             ttk.Label(box, text=label).grid(row=i, column=0, padx=6, pady=2, sticky="w")
 
+            # editable legend tag (the moduli panels prefix it: "K "+tag, etc.)
+            nv = tk.StringVar(value=self.names[key])
+            nent = ttk.Entry(box, textvariable=nv, width=12)
+            nent.grid(row=i, column=1, padx=6, pady=2, sticky="w")
+            nent.bind("<Return>",   lambda e, k=key: self._apply_name(k))
+            nent.bind("<FocusOut>", lambda e, k=key: self._apply_name(k))
+            self.namevars[key] = nv
+
             sw = tk.Button(box, width=3, relief="raised",
                            command=lambda k=key: self._pick_color(k))
-            sw.grid(row=i, column=1, padx=6, pady=2)
+            sw.grid(row=i, column=2, padx=6, pady=2)
             self.swatches[key] = sw
 
             hv = tk.StringVar(value=self.colors[key])
             ent = ttk.Entry(box, textvariable=hv, width=12)
-            ent.grid(row=i, column=2, padx=6, pady=2, sticky="w")
+            ent.grid(row=i, column=3, padx=6, pady=2, sticky="w")
             ent.bind("<Return>",   lambda e, k=key: self._apply_hex(k))
             ent.bind("<FocusOut>", lambda e, k=key: self._apply_hex(k))
             self.hexvars[key] = hv
@@ -148,7 +175,7 @@ class VPlotApp(tk.Tk):
             mv = tk.StringVar(value=MARKER_BY_CODE.get(self.markers[key], "Circle"))
             mcb = ttk.Combobox(box, textvariable=mv, values=list(MARKERS),
                                state="readonly", width=14)
-            mcb.grid(row=i, column=3, padx=6, pady=2, sticky="w")
+            mcb.grid(row=i, column=4, padx=6, pady=2, sticky="w")
             mcb.bind("<<ComboboxSelected>>", lambda e, k=key: self._on_marker(k))
             self.markvars[key] = mv
 
@@ -157,9 +184,9 @@ class VPlotApp(tk.Tk):
     # ------------------------------------------------------------------
     # display-options panel (error-bar visibility)
     # ------------------------------------------------------------------
-    def _build_display_panel(self):
-        box = ttk.LabelFrame(self, text="Error bars", padding=8)
-        box.pack(side=tk.TOP, fill=tk.X, padx=8, pady=(0, 6))
+    def _build_display_panel(self, parent):
+        box = ttk.LabelFrame(parent, text="Error bars", padding=8)
+        box.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
         ttk.Checkbutton(box, text="Show vertical (y) uncertainties",
                         variable=self.show_yerr,
                         command=self._auto_render).pack(side=tk.LEFT, padx=(0, 16))
@@ -170,10 +197,10 @@ class VPlotApp(tk.Tk):
     # ------------------------------------------------------------------
     # axis-bounds panel (rebuilt whenever the chosen figure changes)
     # ------------------------------------------------------------------
-    def _build_bounds_panel(self):
+    def _build_bounds_panel(self, parent):
         self.bounds_box = ttk.LabelFrame(
-            self, text="Axis bounds (blank = auto)", padding=8)
-        self.bounds_box.pack(side=tk.TOP, fill=tk.X, padx=8, pady=(0, 6))
+            parent, text="Axis bounds (blank = auto)", padding=8)
+        self.bounds_box.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
         self._populate_bounds()
 
     def _panel_rows(self):
@@ -299,6 +326,16 @@ class VPlotApp(tk.Tk):
         self.markers[key] = MARKERS[self.markvars[key].get()]
         self._auto_render()
 
+    def _apply_name(self, key):
+        """Store an edited legend tag; blank reverts to the current value."""
+        val = self.namevars[key].get().strip()
+        if not val:
+            self.namevars[key].set(self.names[key])   # don't allow empty
+            return
+        if val != self.names[key]:
+            self.names[key] = val
+            self._auto_render()
+
     def _auto_render(self):
         """Re-draw immediately if a figure is already on screen."""
         if self.current_fig is not None:
@@ -328,6 +365,7 @@ class VPlotApp(tk.Tk):
         # push the current style choices into the shared module
         vc.COL.update(self.colors)
         vc.MARK.update(self.markers)
+        vc.LABEL.update(self.names)   # editable legend tags
         vc.SHOW_YERR = self.show_yerr.get()   # error-bar visibility toggles
         vc.SHOW_XERR = self.show_xerr.get()
         self._collect_bounds()          # push axis bounds into vc.XLIM / vc.YLIM

@@ -70,8 +70,6 @@ def main(path=None, show=False):
     vc.add_break_marks(axes[1], axes[2])
     vc.exterminate_ticks(list(axes))
 
-    fig.suptitle("Vanadium single-crystal elastic constants: CK vs FS",
-                 fontsize=13, y=0.92)
     out = vc.output_path("cij_tri.png")
     fig.savefig(out, dpi=200, bbox_inches="tight")
     print(f"CK/FS points -> {out}")
