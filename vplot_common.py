@@ -59,6 +59,29 @@ MARK = {"CK": "o", "FS": "s", "poly": "D"}
 LABEL = {"CK": "Cook", "FS": "Finite strain", "poly": "Gulick et al. 2025"}
 
 # ----------------------------------------------------------------------
+# Literature / comparison series read from the SAME "All" sheet by header.
+# Each has its OWN pressure column "P <tag>" and quantity columns named
+# "<C11|C12|C44|...> <suffix>" (the same convention as CK / FS, but with NO
+# shared uncertainty block - these are drawn as markers only, no error bars).
+#
+# A panel is drawn only if that series' column exists (and has data), so a
+# source that reports only some constants (e.g. C11 + C44 but no C12) simply
+# skips the missing panel.  To overlay another paper: paste its columns into
+# the "All" sheet with a unique tag, then add one entry here.
+# ----------------------------------------------------------------------
+LIT_SERIES = {
+    "Ant": {"xcol": "P Ant", "suffix": "Ant",
+            "color": "#CC79A7", "marker": "^", "label": "Antonangeli et al."},
+}
+
+# Seed the style dicts with each literature series' defaults so the GUI and
+# the render machinery (which key off COL / MARK / LABEL) pick them up.
+for _k, _cfg in LIT_SERIES.items():
+    COL.setdefault(_k,   _cfg["color"])
+    MARK.setdefault(_k,  _cfg["marker"])
+    LABEL.setdefault(_k, _cfg["label"])
+
+# ----------------------------------------------------------------------
 # Ready-made colour-blind-friendly palettes (CK, FS, poly).  All chosen to
 # avoid the saturated red+blue pairing.  The GUI exposes these by name.
 # ----------------------------------------------------------------------
@@ -87,6 +110,22 @@ SHOW_XERR = True    # horizontal (x) error bars
 # ----------------------------------------------------------------------
 XLIM = [None, None]
 YLIM = {}
+
+# ----------------------------------------------------------------------
+# Output resolution and figure size, set live by the GUI.
+#   DPI     : dots-per-inch used for every savefig (disk + GUI "Save").
+#   FIGSIZE : (width_in, height_in) override, or None to let each plot
+#             module use its own default size.  The GUI takes centimetres
+#             and converts with CM_PER_IN before storing here.
+# ----------------------------------------------------------------------
+DPI = 600
+FIGSIZE = None
+CM_PER_IN = 2.54
+
+
+def figsize_in(default):
+    """Return the GUI-chosen figure size (inches), or the module default."""
+    return FIGSIZE if FIGSIZE else default
 
 
 def apply_xlim(ax):

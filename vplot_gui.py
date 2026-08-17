@@ -42,6 +42,9 @@ SERIES = [
     ("FS",   "FS (finite strain)"),
     ("poly", "poly (Kpoly / Gpoly)"),
 ]
+# literature/comparison series get their own full style rows too (colour +
+# marker + editable legend name), driven from vplot_common.LIT_SERIES.
+SERIES += [(k, cfg["label"]) for k, cfg in vc.LIT_SERIES.items()]
 
 # friendly marker name -> matplotlib marker code
 MARKERS = {
@@ -68,6 +71,10 @@ class VPlotApp(tk.Tk):
         # error-bar visibility toggles (all-vertical / all-horizontal)
         self.show_yerr = tk.BooleanVar(value=vc.SHOW_YERR)
         self.show_xerr = tk.BooleanVar(value=vc.SHOW_XERR)
+        # output resolution + figure size (cm); size blank => module default
+        self.dpi_var = tk.StringVar(value=str(vc.DPI))
+        self.figw_var = tk.StringVar(value="")
+        self.figh_var = tk.StringVar(value="")
         # widget handles filled in by _build_style_panel
         self.hexvars = {}
         self.swatches = {}
@@ -97,6 +104,7 @@ class VPlotApp(tk.Tk):
         self._build_style_panel(left)
         self._build_bounds_panel(right)
         self._build_display_panel(right)
+        self._build_output_panel(right)
 
     # ------------------------------------------------------------------
     def _build_controls(self):
@@ -195,6 +203,32 @@ class VPlotApp(tk.Tk):
                         command=self._auto_render).pack(side=tk.LEFT)
 
     # ------------------------------------------------------------------
+    # output panel: figure size (cm) + export DPI
+    # ------------------------------------------------------------------
+    def _build_output_panel(self, parent):
+        box = ttk.LabelFrame(parent, text="Figure size & DPI", padding=8)
+        box.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
+
+        ttk.Label(box, text="Width (cm):").grid(row=0, column=0, padx=6, pady=2, sticky="w")
+        we = ttk.Entry(box, textvariable=self.figw_var, width=8)
+        we.grid(row=0, column=1, padx=6, pady=2, sticky="w")
+
+        ttk.Label(box, text="Height (cm):").grid(row=0, column=2, padx=6, pady=2, sticky="w")
+        he = ttk.Entry(box, textvariable=self.figh_var, width=8)
+        he.grid(row=0, column=3, padx=6, pady=2, sticky="w")
+
+        ttk.Label(box, text="(blank = default)").grid(
+            row=0, column=4, padx=6, sticky="w")
+
+        ttk.Label(box, text="DPI:").grid(row=1, column=0, padx=6, pady=2, sticky="w")
+        de = ttk.Entry(box, textvariable=self.dpi_var, width=8)
+        de.grid(row=1, column=1, padx=6, pady=2, sticky="w")
+
+        for ent in (we, he, de):
+            ent.bind("<Return>",   lambda e: self._auto_render())
+            ent.bind("<FocusOut>", lambda e: self._auto_render())
+
+    # ------------------------------------------------------------------
     # axis-bounds panel (rebuilt whenever the chosen figure changes)
     # ------------------------------------------------------------------
     def _build_bounds_panel(self, parent):
@@ -271,6 +305,28 @@ class VPlotApp(tk.Tk):
             return float(text)
         except ValueError:
             return None
+
+    def _parse_dpi(self):
+        """Parse the DPI entry; blank or bad text -> the module default (600)."""
+        try:
+            d = int(float(self.dpi_var.get().strip()))
+            if d > 0:
+                return d
+        except ValueError:
+            pass
+        return vc.DPI if vc.DPI else 600
+
+    def _parse_figsize(self):
+        """Return (width_in, height_in) from the cm entries, or None (default).
+
+        Both width and height must parse to positive numbers, else the plot
+        module's own default size is used.
+        """
+        w = self._to_float(self.figw_var.get())
+        h = self._to_float(self.figh_var.get())
+        if w and h and w > 0 and h > 0:
+            return (w / vc.CM_PER_IN, h / vc.CM_PER_IN)
+        return None
 
     def _collect_bounds(self):
         """Push the current bound entries into vc.XLIM / vc.YLIM."""
@@ -368,6 +424,8 @@ class VPlotApp(tk.Tk):
         vc.LABEL.update(self.names)   # editable legend tags
         vc.SHOW_YERR = self.show_yerr.get()   # error-bar visibility toggles
         vc.SHOW_XERR = self.show_xerr.get()
+        vc.DPI = self._parse_dpi()            # export resolution
+        vc.FIGSIZE = self._parse_figsize()    # figure size (in), None => default
         self._collect_bounds()          # push axis bounds into vc.XLIM / vc.YLIM
 
         try:
@@ -395,7 +453,8 @@ class VPlotApp(tk.Tk):
             filetypes=[("PNG", "*.png"), ("PDF", "*.pdf"), ("SVG", "*.svg")],
         )
         if path:
-            self.current_fig.savefig(path, dpi=200, bbox_inches="tight")
+            self.current_fig.savefig(path, dpi=self._parse_dpi(),
+                                     bbox_inches="tight")
             self.status.set(f"Saved -> {os.path.basename(path)}")
 
 

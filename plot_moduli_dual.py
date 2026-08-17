@@ -57,7 +57,7 @@ def main(path=None, show=False):
     df = vc.load_all_data(path)
 
     fig, (ax1, ax2) = plt.subplots(
-        2, 1, figsize=(7, 8), sharex=True,
+        2, 1, figsize=vc.figsize_in((7, 8)), sharex=True,
         gridspec_kw={"hspace": 0.08},
     )
 
@@ -91,7 +91,7 @@ def main(path=None, show=False):
     vc.exterminate_ticks([ax1, ax2])
 
     out = vc.output_path("moduli_dual.png")
-    fig.savefig(out, dpi=200, bbox_inches="tight")
+    fig.savefig(out, dpi=vc.DPI, bbox_inches="tight")
     print(f"CK/FS/poly points -> {out}")
     if show:
         plt.show()

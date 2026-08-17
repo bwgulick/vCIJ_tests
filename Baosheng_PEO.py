@@ -201,6 +201,14 @@ class PEOApp(tk.Tk):
         self.rec_list = tk.Listbox(f_rec, height=4, width=20)
         self.rec_list.pack()
 
+        # --- figure export ---
+        f_fig = ttk.LabelFrame(bar, text="Figure export", padding=4)
+        f_fig.pack(side=tk.LEFT, fill=tk.Y, padx=3)
+        ttk.Button(f_fig, text="Export view (xlsx)",
+                   command=self.export_view).pack(fill=tk.X)
+        ttk.Label(f_fig, text="writes the visible\ntime window to Excel",
+                  justify="left").pack(anchor="w")
+
         # --- readout ---
         self.readout = ttk.Label(self, text="Travel time: -- us",
                                  font=("Segoe UI", 16, "bold"), anchor="w")
@@ -397,6 +405,79 @@ class PEOApp(tk.Tk):
         df["source_file"] = self.filename
         df.to_csv(path, index=False)
         messagebox.showinfo("Export", f"Wrote {len(df)} record(s) to\n{path}")
+
+    def export_view(self):
+        """Write the samples inside the current (zoomed) time window to Excel.
+
+        Use this to grab the focused echo region so it can be re-plotted for a
+        paper figure (amplitude vs time, e.g. the P- and S-wave echo trains).
+        The visible x-range of the top panel defines the exported window; the
+        shared x-axis means the bottom (interference) panel covers the same span.
+        """
+        if self.signal is None:
+            messagebox.showinfo("Export view", "Load a waveform first.")
+            return
+
+        x0, x1 = self.ax_top.get_xlim()
+        lo, hi = (x0, x1) if x0 <= x1 else (x1, x0)
+        mask = (self.t_us >= lo) & (self.t_us <= hi)
+        if not np.any(mask):
+            messagebox.showinfo("Export view", "No samples in the current view.")
+            return
+
+        filt_on = self.filter_on.get()
+        fc = float(self.fc.get()) if filt_on else float("nan")
+        # label common P/S centre frequencies for a friendly default filename
+        if filt_on and abs(fc - 50) < 1e-6:
+            wave = "P"
+        elif filt_on and abs(fc - 30) < 1e-6:
+            wave = "S"
+        else:
+            wave = "raw"
+        stem = os.path.splitext(self.filename)[0] if self.filename != "(none)" else "waveform"
+
+        path = filedialog.asksaveasfilename(
+            title="Export visible waveform to Excel",
+            defaultextension=".xlsx",
+            filetypes=[("Excel workbook", "*.xlsx")],
+            initialfile=f"{stem}_{wave}_view.xlsx",
+        )
+        if not path:
+            return
+
+        t = self.t_us[mask]
+        wave_df = pd.DataFrame({
+            "time_us": t,
+            "raw_amplitude": self.raw[mask],
+        })
+        if filt_on:
+            wave_df[f"filtered_amplitude_{fc:g}MHz"] = self.signal[mask]
+
+        info_df = pd.DataFrame({
+            "field": [
+                "source_file", "filter_enabled", "center_freq_MHz",
+                "bandwidth_MHz", "filter_order", "window_start_us",
+                "window_end_us", "n_samples", "sample_interval_us",
+            ],
+            "value": [
+                self.filename, filt_on, fc,
+                float(self.bw.get()) if filt_on else float("nan"),
+                int(self.order.get()) if filt_on else float("nan"),
+                float(t.min()), float(t.max()), int(t.size), self.dt_us,
+            ],
+        })
+
+        try:
+            with pd.ExcelWriter(path, engine="openpyxl") as xl:
+                wave_df.to_excel(xl, sheet_name="waveform", index=False)
+                info_df.to_excel(xl, sheet_name="info", index=False)
+        except Exception as exc:
+            messagebox.showerror("Export view", str(exc))
+            return
+
+        messagebox.showinfo(
+            "Export view",
+            f"Wrote {t.size} samples ({lo:.4f}-{hi:.4f} us) to\n{path}")
 
 
 if __name__ == "__main__":

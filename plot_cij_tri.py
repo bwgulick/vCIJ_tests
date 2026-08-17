@@ -31,7 +31,7 @@ def main(path=None, show=False):
     df = vc.load_all_data(path)
 
     fig, axes = plt.subplots(
-        3, 1, figsize=(7, 9), sharex=True,
+        3, 1, figsize=vc.figsize_in((7, 9)), sharex=True,
         gridspec_kw={"hspace": 0.08},
     )
 
@@ -50,6 +50,18 @@ def main(path=None, show=False):
         vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
                     color=vc.COL["FS"], marker=vc.MARK["FS"], label=vc.LABEL["FS"])
 
+        # --- literature / comparison series (markers only, no error bars) ---
+        # drawn per panel only where that source reports the constant.
+        for k, cfg in vc.LIT_SERIES.items():
+            ycol = f"{key} {cfg['suffix']}"
+            if cfg["xcol"] not in df.columns or ycol not in df.columns:
+                continue                      # this paper doesn't report this constant
+            x, y, _, _ = vc.series_xy(df, cfg["xcol"], ycol)   # no error columns
+            if x.size == 0:
+                continue                      # column present but empty
+            vc.draw_pts(ax, x, y,
+                        color=vc.COL[k], marker=vc.MARK[k], label=vc.LABEL[k])
+
         ax.set_ylabel(ylab, fontsize=12)
         ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
         ax.margins(y=0.15)
@@ -58,11 +70,14 @@ def main(path=None, show=False):
     axes[-1].set_xlabel("Pressure (GPa)", fontsize=12)
     vc.apply_xlim(axes[-1])             # shared x bounds (sharex propagates)
 
-    # single combined legend (dedup handles) on the top panel
+    # single combined legend (dedup handles) on the top panel.  Collect across
+    # ALL panels so a literature series that appears only on C12/C44 (not C11)
+    # still gets a legend entry.
     handles, labels = [], []
-    for h, l in zip(*axes[0].get_legend_handles_labels()):
-        if l not in labels:
-            handles.append(h); labels.append(l)
+    for ax in axes:
+        for h, l in zip(*ax.get_legend_handles_labels()):
+            if l not in labels:
+                handles.append(h); labels.append(l)
     axes[0].legend(handles, labels, fontsize=10, frameon=False, loc="best")
 
     # break marks between each stacked pair, then exterminate
@@ -71,7 +86,7 @@ def main(path=None, show=False):
     vc.exterminate_ticks(list(axes))
 
     out = vc.output_path("cij_tri.png")
-    fig.savefig(out, dpi=200, bbox_inches="tight")
+    fig.savefig(out, dpi=vc.DPI, bbox_inches="tight")
     print(f"CK/FS points -> {out}")
     if show:
         plt.show()
