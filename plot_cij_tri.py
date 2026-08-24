@@ -30,6 +30,7 @@ PANELS = [
 def main(path=None, show=False):
     df = vc.load_all_data(path)
 
+    s = vc.set_scale((7, 9))          # text/marker scale for the chosen size
     fig, axes = plt.subplots(
         3, 1, figsize=vc.figsize_in((7, 9)), sharex=True,
         gridspec_kw={"hspace": 0.08},
@@ -62,12 +63,13 @@ def main(path=None, show=False):
             vc.draw_pts(ax, x, y,
                         color=vc.COL[k], marker=vc.MARK[k], label=vc.LABEL[k])
 
-        ax.set_ylabel(ylab, fontsize=12)
+        ax.set_ylabel(ylab, fontsize=12 * s)
+        ax.tick_params(axis="both", labelsize=10 * s)
         ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
         ax.margins(y=0.15)
         vc.apply_ylim(ax, key)          # GUI-set y bounds (blank => auto)
 
-    axes[-1].set_xlabel("Pressure (GPa)", fontsize=12)
+    axes[-1].set_xlabel("Pressure (GPa)", fontsize=12 * s)
     vc.apply_xlim(axes[-1])             # shared x bounds (sharex propagates)
 
     # single combined legend (dedup handles) on the top panel.  Collect across
@@ -78,7 +80,7 @@ def main(path=None, show=False):
         for h, l in zip(*ax.get_legend_handles_labels()):
             if l not in labels:
                 handles.append(h); labels.append(l)
-    axes[0].legend(handles, labels, fontsize=10, frameon=False, loc="best")
+    axes[0].legend(handles, labels, fontsize=10 * s, frameon=False, loc="best")
 
     # break marks between each stacked pair, then exterminate
     vc.add_break_marks(axes[0], axes[1])

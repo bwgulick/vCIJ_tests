@@ -122,10 +122,29 @@ DPI = 600
 FIGSIZE = None
 CM_PER_IN = 2.54
 
+# Text / marker scale factor.  1.0 at a module's default figure size; shrinks
+# with the figure so fonts and markers stay proportional when the GUI resizes
+# it.  Each plot's main() sets this via set_scale() before drawing.
+SCALE = 1.0
+
 
 def figsize_in(default):
     """Return the GUI-chosen figure size (inches), or the module default."""
     return FIGSIZE if FIGSIZE else default
+
+
+def set_scale(default):
+    """Set & return the text/marker scale for the current figure size.
+
+    The factor is the geometric mean of the width and height ratios relative
+    to `default`, so a figure half as wide and half as tall scales text to
+    half size (not a quarter).  Returns 1.0 when no size override is set.
+    """
+    global SCALE
+    w, h = figsize_in(default)
+    dw, dh = default
+    SCALE = ((w / dw) * (h / dh)) ** 0.5
+    return SCALE
 
 
 def apply_xlim(ax):
@@ -185,7 +204,7 @@ def draw_pts(ax, x, y, yerr=None, xerr=None, *, color, marker="o", label=None):
         yerr=yerr if SHOW_YERR else None,
         xerr=xerr if SHOW_XERR else None,
         fmt=marker, color=color,
-        markersize=6, capsize=4, elinewidth=1.2,
+        markersize=6 * SCALE, capsize=4 * SCALE, elinewidth=1.2 * SCALE,
         markeredgewidth=0, zorder=4, label=label,
     )
 

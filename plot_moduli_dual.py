@@ -56,6 +56,7 @@ def _draw_panel(ax, df, ck_col, fs_col, ncrt_col, poly_col, poly_err):
 def main(path=None, show=False):
     df = vc.load_all_data(path)
 
+    s = vc.set_scale((7, 8))          # text/marker scale for the chosen size
     fig, (ax1, ax2) = plt.subplots(
         2, 1, figsize=vc.figsize_in((7, 8)), sharex=True,
         gridspec_kw={"hspace": 0.08},
@@ -67,9 +68,11 @@ def main(path=None, show=False):
     _draw_panel(ax1, df, k_ck, k_fs, k_ncrt, k_pcol, k_perr)
     _draw_panel(ax2, df, g_ck, g_fs, g_ncrt, g_pcol, g_perr)
 
-    ax1.set_ylabel(k_ylab, fontsize=12)
-    ax2.set_ylabel(g_ylab, fontsize=12)
-    ax2.set_xlabel("Pressure (GPa)", fontsize=12)
+    ax1.set_ylabel(k_ylab, fontsize=12 * s)
+    ax2.set_ylabel(g_ylab, fontsize=12 * s)
+    ax2.set_xlabel("Pressure (GPa)", fontsize=12 * s)
+    ax1.tick_params(axis="both", labelsize=10 * s)
+    ax2.tick_params(axis="both", labelsize=10 * s)
 
     # GUI-set bounds (blank => auto); sharex propagates the x limits
     vc.apply_ylim(ax1, k_key)
@@ -83,7 +86,7 @@ def main(path=None, show=False):
         for h, l in zip(*ax.get_legend_handles_labels()):
             if l not in labels:
                 handles.append(h); labels.append(l)
-    ax1.legend(handles, labels, fontsize=9, frameon=False,
+    ax1.legend(handles, labels, fontsize=9 * s, frameon=False,
                loc="upper left", ncol=3)
 
     # clean interior spines/ticks (no diagonal break marks - K and G_H are

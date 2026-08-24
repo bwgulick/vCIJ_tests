@@ -441,8 +441,16 @@ class VPlotApp(tk.Tk):
         self.canvas.draw()
         self.toolbar = NavigationToolbar2Tk(self.canvas, self.canvas_frame)
         self.toolbar.update()
-        self.canvas.get_tk_widget().pack(fill=tk.BOTH, expand=True)
-        self.status.set(f"Rendered: {self.fig_choice.get()}")
+        # WYSIWYG: show the figure at its true size (width_in x height_in x the
+        # figure's display dpi) instead of stretching it to fill the window, so
+        # the on-screen plot visibly scales with the entered dimensions.  No
+        # fill/expand => the packer keeps the canvas at its requested pixel size.
+        self.canvas.get_tk_widget().pack(anchor="center", pady=6)
+        w_cm = fig.get_size_inches()[0] * vc.CM_PER_IN
+        h_cm = fig.get_size_inches()[1] * vc.CM_PER_IN
+        self.status.set(
+            f"Rendered: {self.fig_choice.get()}  "
+            f"({w_cm:.1f} x {h_cm:.1f} cm @ {vc.DPI} dpi)")
 
     def save(self):
         if self.current_fig is None:
