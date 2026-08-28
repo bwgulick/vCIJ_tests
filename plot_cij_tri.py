@@ -40,20 +40,24 @@ def main(path=None, show=False):
         ncrt = f"ncrt {key}"
 
         # --- CK (Cook's method) ---
-        x, y, ye, xe = vc.series_xy(
-            df, "P EXP", f"{key} CK", yerrcol=ncrt, xerrcol="ncrt P")
-        vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
-                    color=vc.COL["CK"], marker=vc.MARK["CK"], label=vc.LABEL["CK"])
+        if vc.visible("CK"):
+            x, y, ye, xe = vc.series_xy(
+                df, "P EXP", f"{key} CK", yerrcol=ncrt, xerrcol="ncrt P")
+            vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
+                        color=vc.COL["CK"], marker=vc.MARK["CK"], label=vc.LABEL["CK"])
 
         # --- FS (finite strain) ---
-        x, y, ye, xe = vc.series_xy(
-            df, "P FS", f"{key} FS", yerrcol=ncrt, xerrcol="ncrt P")
-        vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
-                    color=vc.COL["FS"], marker=vc.MARK["FS"], label=vc.LABEL["FS"])
+        if vc.visible("FS"):
+            x, y, ye, xe = vc.series_xy(
+                df, "P FS", f"{key} FS", yerrcol=ncrt, xerrcol="ncrt P")
+            vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
+                        color=vc.COL["FS"], marker=vc.MARK["FS"], label=vc.LABEL["FS"])
 
         # --- literature / comparison series (markers only, no error bars) ---
         # drawn per panel only where that source reports the constant.
         for k, cfg in vc.LIT_SERIES.items():
+            if not vc.visible(k):
+                continue                      # deselected in the GUI
             ycol = f"{key} {cfg['suffix']}"
             if cfg["xcol"] not in df.columns or ycol not in df.columns:
                 continue                      # this paper doesn't report this constant
@@ -63,7 +67,7 @@ def main(path=None, show=False):
             vc.draw_pts(ax, x, y,
                         color=vc.COL[k], marker=vc.MARK[k], label=vc.LABEL[k])
 
-        ax.set_ylabel(ylab, fontsize=12 * s)
+        ax.set_ylabel(vc.ylabel_for(key, ylab), fontsize=12 * s)
         ax.tick_params(axis="both", labelsize=10 * s)
         ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
         ax.margins(y=0.15)
@@ -80,7 +84,7 @@ def main(path=None, show=False):
         for h, l in zip(*ax.get_legend_handles_labels()):
             if l not in labels:
                 handles.append(h); labels.append(l)
-    axes[0].legend(handles, labels, fontsize=10 * s, frameon=False, loc="best")
+    vc.place_legend(axes[0], handles, labels, 10 * s)
 
     # break marks between each stacked pair, then exterminate
     vc.add_break_marks(axes[0], axes[1])

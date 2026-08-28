@@ -30,21 +30,22 @@ from matplotlib.colors import is_color_like, to_hex
 import vplot_common as vc
 import plot_cij_tri
 import plot_moduli_dual
+import plot_single
 
 FIGURES = {
     "Cij tri-plot (C11 / C12 / C44) - CK vs FS": plot_cij_tri,
     "Moduli dual (K / GH) - CK vs FS + poly":    plot_moduli_dual,
+    "Single element (pick one) - CK vs FS + poly": plot_single,
 }
 
-# series key -> friendly label shown in the style panel
-SERIES = [
+# core series key -> friendly label shown in the style panel.  Comparison
+# sources (Katahara, Antonangeli, ...) are auto-discovered from the workbook
+# and appended at runtime by _series_list(), so no source is hard-coded here.
+CORE_SERIES = [
     ("CK",   "CK (Cook)"),
     ("FS",   "FS (finite strain)"),
     ("poly", "poly (Kpoly / Gpoly)"),
 ]
-# literature/comparison series get their own full style rows too (colour +
-# marker + editable legend name), driven from vplot_common.LIT_SERIES.
-SERIES += [(k, cfg["label"]) for k, cfg in vc.LIT_SERIES.items()]
 
 # friendly marker name -> matplotlib marker code
 MARKERS = {
@@ -52,7 +53,19 @@ MARKERS = {
     "Diamond": "D", "Pentagon": "p", "Star": "*", "Plus": "P",
     "X": "X", "Hexagon": "h",
 }
-MARKER_BY_CODE = {v: k for k, v in MARKERS.items()}
+
+# friendly line name -> matplotlib line-style code.  Choosing one of these
+# draws the series as a connecting line (no point markers) instead of scattered
+# points - e.g. render the Katahara (Kat) curve as a solid or dashed line.
+LINE_STYLES = {
+    "Solid line": "-", "Dashed line": "--",
+    "Dotted line": ":", "Dash-dot line": "-.",
+}
+
+# combined choices shown in the per-series style dropdown (markers first, then
+# lines).  STYLE_BY_CODE maps a stored code back to its friendly name.
+STYLES = {**MARKERS, **LINE_STYLES}
+MARKER_BY_CODE = {v: k for k, v in STYLES.items()}
 
 
 class VPlotApp(tk.Tk):
@@ -64,7 +77,13 @@ class VPlotApp(tk.Tk):
         self.canvas = None
         self.toolbar = None
 
-        # live per-series style, seeded from the module defaults
+        # Discover comparison sources from the default workbook up front, so
+        # their style rows are present before the first render.  Safe if the
+        # file is missing - the rows just appear after the first successful plot.
+        self._discover(vc.DEFAULT_XLSX)
+
+        # live per-series style, seeded from the module defaults (now including
+        # any auto-discovered sources)
         self.colors = dict(vc.COL)
         self.markers = dict(vc.MARK)
         self.names = dict(vc.LABEL)   # editable legend tags (CK / FS / PC)
@@ -75,14 +94,27 @@ class VPlotApp(tk.Tk):
         self.dpi_var = tk.StringVar(value=str(vc.DPI))
         self.figw_var = tk.StringVar(value="")
         self.figh_var = tk.StringVar(value="")
+        # legend placement: X/Y anchor (axes fraction, blank => auto/movable)
+        # + column count ("auto" => each plot's own default).  Drag the legend
+        # on the canvas to fill X/Y, or type them directly.
+        self.leg_x_var = tk.StringVar(value="")
+        self.leg_y_var = tk.StringVar(value="")
+        self.leg_ncol_var = tk.StringVar(value="auto")
+        self._dragging_legend = False   # True while a legend drag is in flight
         # widget handles filled in by _build_style_panel
         self.hexvars = {}
         self.swatches = {}
         self.markvars = {}
         self.namevars = {}
+        self.showvars = {}       # per-series "plot this dataset?" checkboxes
+        self.show_state = {}     # remembered show/hide across style-row rebuilds
+        self._built_series_keys = []   # series keys the style rows were built for
         # axis-bounds state (see _build_bounds_panel)
         self.bound_vars = {}     # "x" / panel key -> (lo StringVar, hi StringVar)
         self.bound_store = {}    # key -> [lo str, hi str], kept across figure switches
+        # editable per-panel y-axis label state
+        self.ylabel_vars = {}    # panel key -> label StringVar
+        self.ylabel_store = {}   # key -> label str, kept across figure switches
 
         self._build_controls()
         self._build_settings_row()
@@ -104,6 +136,7 @@ class VPlotApp(tk.Tk):
         self._build_style_panel(left)
         self._build_bounds_panel(right)
         self._build_display_panel(right)
+        self._build_legend_panel(right)
         self._build_output_panel(right)
 
     # ------------------------------------------------------------------
@@ -119,6 +152,16 @@ class VPlotApp(tk.Tk):
         )
         fig_cb.pack(side=tk.LEFT, padx=(4, 12))
         fig_cb.bind("<<ComboboxSelected>>", self._on_figure_change)
+
+        # single-element selector (only affects the "Single element" figure)
+        ttk.Label(bar, text="Element:").pack(side=tk.LEFT)
+        self.single_var = tk.StringVar(value=vc.SINGLE)
+        el_cb = ttk.Combobox(
+            bar, textvariable=self.single_var, values=list(vc.QUANTITIES),
+            state="readonly", width=11,
+        )
+        el_cb.pack(side=tk.LEFT, padx=(4, 12))
+        el_cb.bind("<<ComboboxSelected>>", self._on_single_change)
 
         ttk.Button(bar, text="Plot", command=self.render).pack(side=tk.LEFT)
         ttk.Button(bar, text="Save PNG...", command=self.save).pack(
@@ -137,13 +180,28 @@ class VPlotApp(tk.Tk):
         ttk.Label(self, textvariable=self.status, relief=tk.SUNKEN,
                   anchor=tk.W).pack(side=tk.BOTTOM, fill=tk.X)
 
+    @staticmethod
+    def _discover(path):
+        """Populate vc.LIT_SERIES from a workbook, ignoring any read error."""
+        try:
+            vc.load_all_data(path)
+        except Exception:
+            pass
+
+    def _series_list(self):
+        """Core series + every auto-discovered comparison source (in order)."""
+        rows = list(CORE_SERIES)
+        for k in vc.LIT_SERIES:
+            rows.append((k, vc.LABEL.get(k, k)))   # friendly label = legend name
+        return rows
+
     def _build_style_panel(self, parent):
         box = ttk.LabelFrame(parent, text="Series style (colour + marker)", padding=8)
         box.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
 
-        # preset palette row
+        # preset palette row (static - lives above the re-buildable rows frame)
         prow = ttk.Frame(box)
-        prow.grid(row=0, column=0, columnspan=4, sticky="w", pady=(0, 6))
+        prow.pack(side=tk.TOP, anchor="w", pady=(0, 6))
         ttk.Label(prow, text="Palette preset:").pack(side=tk.LEFT)
         self.palette_var = tk.StringVar(value="Okabe-Ito (CB-safe)")
         pcb = ttk.Combobox(prow, textvariable=self.palette_var,
@@ -151,43 +209,85 @@ class VPlotApp(tk.Tk):
         pcb.pack(side=tk.LEFT, padx=6)
         pcb.bind("<<ComboboxSelected>>", self._apply_palette)
 
+        # rows (one per series) live in their own frame so new sources can be
+        # added without rebuilding the whole panel.
+        self.style_rows_frame = ttk.Frame(box)
+        self.style_rows_frame.pack(side=tk.TOP, fill=tk.X)
+        self._build_style_rows()
+
+    def _build_style_rows(self):
+        """(Re)build the per-series style rows for the current source list.
+
+        Called on start-up and again whenever discovery turns up a new source
+        (e.g. after switching to a workbook with an extra tag).  Existing style
+        choices are preserved via self.colors / markers / names / show_state.
+        """
+        frame = self.style_rows_frame
+
+        # remember the current show/hide state before the old widgets die
+        for k, v in self.showvars.items():
+            self.show_state[k] = v.get()
+        for w in frame.winfo_children():
+            w.destroy()
+        self.hexvars, self.swatches = {}, {}
+        self.markvars, self.namevars, self.showvars = {}, {}, {}
+
         # column headers
         for c, txt in enumerate(
-                ("Series", "Legend name", "Colour", "Hex / name", "Marker")):
-            ttk.Label(box, text=txt).grid(row=1, column=c, padx=6, sticky="w")
+                ("Show", "Series", "Legend name", "Colour", "Hex / name",
+                 "Marker / line")):
+            ttk.Label(frame, text=txt).grid(row=0, column=c, padx=6, sticky="w")
 
-        # one row per series
-        for i, (key, label) in enumerate(SERIES, start=2):
-            ttk.Label(box, text=label).grid(row=i, column=0, padx=6, pady=2, sticky="w")
+        # one row per series (core + auto-discovered sources)
+        for i, (key, label) in enumerate(self._series_list(), start=1):
+            # seed style state for a source we haven't shown before
+            self.colors.setdefault(key, vc.COL.get(key, "#000000"))
+            self.markers.setdefault(key, vc.MARK.get(key, "o"))
+            self.names.setdefault(key, vc.LABEL.get(key, key))
+
+            # visibility checkbox - unchecked drops the whole dataset from the plot
+            sv = tk.BooleanVar(value=self.show_state.get(key, vc.visible(key)))
+            scb = ttk.Checkbutton(frame, variable=sv, command=self._auto_render)
+            scb.grid(row=i, column=0, padx=6, pady=2)
+            self.showvars[key] = sv
+
+            ttk.Label(frame, text=label).grid(row=i, column=1, padx=6, pady=2, sticky="w")
 
             # editable legend tag (the moduli panels prefix it: "K "+tag, etc.)
             nv = tk.StringVar(value=self.names[key])
-            nent = ttk.Entry(box, textvariable=nv, width=12)
-            nent.grid(row=i, column=1, padx=6, pady=2, sticky="w")
+            nent = ttk.Entry(frame, textvariable=nv, width=12)
+            nent.grid(row=i, column=2, padx=6, pady=2, sticky="w")
             nent.bind("<Return>",   lambda e, k=key: self._apply_name(k))
             nent.bind("<FocusOut>", lambda e, k=key: self._apply_name(k))
             self.namevars[key] = nv
 
-            sw = tk.Button(box, width=3, relief="raised",
+            sw = tk.Button(frame, width=3, relief="raised",
                            command=lambda k=key: self._pick_color(k))
-            sw.grid(row=i, column=2, padx=6, pady=2)
+            sw.grid(row=i, column=3, padx=6, pady=2)
             self.swatches[key] = sw
 
             hv = tk.StringVar(value=self.colors[key])
-            ent = ttk.Entry(box, textvariable=hv, width=12)
-            ent.grid(row=i, column=3, padx=6, pady=2, sticky="w")
+            ent = ttk.Entry(frame, textvariable=hv, width=12)
+            ent.grid(row=i, column=4, padx=6, pady=2, sticky="w")
             ent.bind("<Return>",   lambda e, k=key: self._apply_hex(k))
             ent.bind("<FocusOut>", lambda e, k=key: self._apply_hex(k))
             self.hexvars[key] = hv
 
             mv = tk.StringVar(value=MARKER_BY_CODE.get(self.markers[key], "Circle"))
-            mcb = ttk.Combobox(box, textvariable=mv, values=list(MARKERS),
+            mcb = ttk.Combobox(frame, textvariable=mv, values=list(STYLES),
                                state="readonly", width=14)
-            mcb.grid(row=i, column=4, padx=6, pady=2, sticky="w")
+            mcb.grid(row=i, column=5, padx=6, pady=2, sticky="w")
             mcb.bind("<<ComboboxSelected>>", lambda e, k=key: self._on_marker(k))
             self.markvars[key] = mv
 
             self._set_color(key, self.colors[key])   # paint the swatch
+
+        self._built_series_keys = [k for k, _ in self._series_list()]
+
+    def _sync_style_rows(self):
+        """Rebuild the style rows if discovery has turned up new sources."""
+        if [k for k, _ in self._series_list()] != self._built_series_keys:
+            self._build_style_rows()
 
     # ------------------------------------------------------------------
     # display-options panel (error-bar visibility)
@@ -201,6 +301,111 @@ class VPlotApp(tk.Tk):
         ttk.Checkbutton(box, text="Show horizontal (x) uncertainties",
                         variable=self.show_xerr,
                         command=self._auto_render).pack(side=tk.LEFT)
+
+    # ------------------------------------------------------------------
+    # legend panel: position (drag or type) + column count
+    # ------------------------------------------------------------------
+    def _build_legend_panel(self, parent):
+        box = ttk.LabelFrame(parent, text="Legend", padding=8)
+        box.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
+
+        ttk.Label(box, text="X (0-1):").grid(row=0, column=0, padx=6, pady=2, sticky="w")
+        xe = ttk.Entry(box, textvariable=self.leg_x_var, width=8)
+        xe.grid(row=0, column=1, padx=6, pady=2, sticky="w")
+
+        ttk.Label(box, text="Y (0-1):").grid(row=0, column=2, padx=6, pady=2, sticky="w")
+        ye = ttk.Entry(box, textvariable=self.leg_y_var, width=8)
+        ye.grid(row=0, column=3, padx=6, pady=2, sticky="w")
+
+        ttk.Label(box, text="Columns:").grid(row=0, column=4, padx=6, pady=2, sticky="w")
+        ncb = ttk.Combobox(box, textvariable=self.leg_ncol_var, width=6,
+                           state="readonly",
+                           values=["auto", "1", "2", "3", "4", "5", "6"])
+        ncb.grid(row=0, column=5, padx=6, pady=2, sticky="w")
+        ncb.bind("<<ComboboxSelected>>", lambda e: self._auto_render())
+
+        ttk.Button(box, text="Reset position (auto)",
+                   command=self._reset_legend).grid(
+                       row=1, column=0, columnspan=2, padx=6, pady=(4, 0), sticky="w")
+        ttk.Label(box, text="Blank X/Y = auto; or drag the legend on the plot"
+                  ).grid(row=1, column=2, columnspan=4, padx=6, pady=(4, 0), sticky="w")
+
+        for ent in (xe, ye):
+            ent.bind("<Return>",   lambda e: self._auto_render())
+            ent.bind("<FocusOut>", lambda e: self._auto_render())
+
+    def _reset_legend(self):
+        """Clear the pinned X/Y so the legend goes back to auto placement."""
+        self.leg_x_var.set("")
+        self.leg_y_var.set("")
+        vc.LEGEND_XY = None
+        self._auto_render()
+
+    def _collect_legend(self):
+        """Push the legend position + column count into vplot_common."""
+        x = self._to_float(self.leg_x_var.get())
+        y = self._to_float(self.leg_y_var.get())
+        vc.LEGEND_XY = (x, y) if (x is not None and y is not None) else None
+        val = self.leg_ncol_var.get().strip().lower()
+        if val in ("", "auto"):
+            vc.LEGEND_NCOL = None
+        else:
+            try:
+                vc.LEGEND_NCOL = max(1, int(float(val)))
+            except ValueError:
+                vc.LEGEND_NCOL = None
+
+    # ------------------------------------------------------------------
+    # legend drag: locate the on-canvas legend and read its position back
+    # into the X/Y boxes when the user drops it.
+    # ------------------------------------------------------------------
+    def _find_legend(self):
+        """Return (legend, axes) for the current figure's legend, or None."""
+        if self.current_fig is None:
+            return None
+        for ax in self.current_fig.axes:
+            leg = ax.get_legend()
+            if leg is not None:
+                return leg, ax
+        return None
+
+    def _legend_bbox(self, leg):
+        """Display-coordinate bounding box of the legend, or None."""
+        try:
+            return leg.get_window_extent(self.canvas.get_renderer())
+        except Exception:
+            try:
+                return leg.get_window_extent()
+            except Exception:
+                return None
+
+    def _on_canvas_press(self, event):
+        """Flag a drag only when the press lands on the legend box."""
+        self._dragging_legend = False
+        found = self._find_legend()
+        if found is None or event.x is None:
+            return
+        bbox = self._legend_bbox(found[0])
+        if bbox is not None and bbox.contains(event.x, event.y):
+            self._dragging_legend = True
+
+    def _on_canvas_release(self, _event):
+        """After a legend drag, write its upper-left corner into X/Y (axes
+        fraction) and persist it so the next render keeps the spot."""
+        if not self._dragging_legend:
+            return
+        self._dragging_legend = False
+        found = self._find_legend()
+        if found is None:
+            return
+        leg, ax = found
+        bbox = self._legend_bbox(leg)
+        if bbox is None:
+            return
+        x0, y1 = ax.transAxes.inverted().transform((bbox.x0, bbox.y1))
+        self.leg_x_var.set(f"{x0:.3f}")
+        self.leg_y_var.set(f"{y1:.3f}")
+        vc.LEGEND_XY = (float(x0), float(y1))   # keep it on the next render
 
     # ------------------------------------------------------------------
     # output panel: figure size (cm) + export DPI
@@ -233,30 +438,45 @@ class VPlotApp(tk.Tk):
     # ------------------------------------------------------------------
     def _build_bounds_panel(self, parent):
         self.bounds_box = ttk.LabelFrame(
-            parent, text="Axis bounds (blank = auto)", padding=8)
+            parent, text="Axis bounds (blank = auto) & labels", padding=8)
         self.bounds_box.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
         self._populate_bounds()
 
     def _panel_rows(self):
-        """(key, label) rows for the current figure: shared x + one per panel."""
+        """(key, row-label, default y-axis label) rows for the current figure.
+
+        First row is the shared pressure x-axis (no editable y-label -> None);
+        then one row per panel carrying that panel's default y-axis label text
+        (PANELS[i][1]) so the GUI can seed the editable label box with what the
+        plot currently shows.
+        """
         module = FIGURES[self.fig_choice.get()]
-        rows = [("x", "Pressure  (x, shared)")]
+        rows = [("x", "Pressure  (x, shared)", None)]
+        # the single-element figure has one panel driven by the Element dropdown,
+        # not a fixed module.PANELS list, so build its row from the selection.
+        if module is plot_single:
+            key = self.single_var.get()
+            ylab = vc.QUANTITIES.get(key, (key, None, None))[0]
+            rows.append((key, f"{key}  (y)", ylab))
+            return rows
         for p in getattr(module, "PANELS", []):
             key = p[0]
-            rows.append((key, f"{key}  (y)"))
+            default_ylab = p[1] if len(p) > 1 else key
+            rows.append((key, f"{key}  (y)", default_ylab))
         return rows
 
     def _populate_bounds(self):
-        """Clear and rebuild the bounds rows for the current figure."""
+        """Clear and rebuild the bounds + label rows for the current figure."""
         for w in self.bounds_box.winfo_children():
             w.destroy()
         self.bound_vars = {}
+        self.ylabel_vars = {}
 
-        for c, txt in enumerate(("Axis / panel", "Lower", "Upper")):
+        for c, txt in enumerate(("Axis / panel", "Lower", "Upper", "Axis label")):
             ttk.Label(self.bounds_box, text=txt).grid(
                 row=0, column=c, padx=6, pady=(0, 4), sticky="w")
 
-        for r, (key, label) in enumerate(self._panel_rows(), start=1):
+        for r, (key, label, default_ylab) in enumerate(self._panel_rows(), start=1):
             ttk.Label(self.bounds_box, text=label).grid(
                 row=r, column=0, padx=6, pady=2, sticky="w")
             saved = self.bound_store.get(key, ["", ""])
@@ -269,20 +489,44 @@ class VPlotApp(tk.Tk):
                 ent.bind("<FocusOut>", self._on_bound_edit)
             self.bound_vars[key] = (lo, hi)
 
-        # "Auto (clear all)" convenience button
+            # editable y-axis label (y panels only; the shared x row has none).
+            # Seed with the user's saved text, else the plot's current default
+            # so they can see and trim it, e.g. "Shear modulus $G_H$ (GPa)" ->
+            # "GH".  Blank falls back to the module default at render time.
+            if default_ylab is not None:
+                lv = tk.StringVar(
+                    value=self.ylabel_store.get(key, default_ylab))
+                lent = ttk.Entry(self.bounds_box, textvariable=lv, width=24)
+                lent.grid(row=r, column=3, padx=6, pady=2, sticky="w")
+                lent.bind("<Return>",   self._on_bound_edit)
+                lent.bind("<FocusOut>", self._on_bound_edit)
+                self.ylabel_vars[key] = lv
+
+        # "Auto (clear all)" convenience button (bounds only; labels persist)
         ttk.Button(self.bounds_box, text="Auto (clear all)",
                    command=self._clear_bounds).grid(
                        row=len(self.bound_vars) + 1, column=0,
-                       columnspan=3, sticky="w", padx=6, pady=(6, 0))
+                       columnspan=4, sticky="w", padx=6, pady=(6, 0))
 
     def _stash_bounds(self):
         """Remember current entries so they survive a figure switch."""
         for key, (lo, hi) in self.bound_vars.items():
             self.bound_store[key] = [lo.get(), hi.get()]
+        for key, lv in self.ylabel_vars.items():
+            self.ylabel_store[key] = lv.get()
 
     def _on_figure_change(self, _event=None):
         self._stash_bounds()
         self._populate_bounds()
+
+    def _on_single_change(self, _event=None):
+        """Element dropdown changed: rebuild bounds for the new quantity and
+        redraw if the single-element figure is the one on screen."""
+        self._stash_bounds()
+        vc.SINGLE = self.single_var.get()
+        self._populate_bounds()
+        if FIGURES[self.fig_choice.get()] is plot_single:
+            self._auto_render()
 
     def _on_bound_edit(self, _event=None):
         self._stash_bounds()
@@ -339,6 +583,17 @@ class VPlotApp(tk.Tk):
             else:
                 vc.YLIM[key] = pair
 
+    def _collect_ylabels(self):
+        """Push the current per-panel label entries into vc.YLABEL.
+
+        Blank entries are left out, so those panels keep their module default.
+        """
+        vc.YLABEL.clear()
+        for key, lv in self.ylabel_vars.items():
+            text = lv.get().strip()
+            if text:
+                vc.YLABEL[key] = text
+
     def _build_canvas_area(self):
         self.canvas_frame = ttk.Frame(self)
         self.canvas_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
@@ -379,7 +634,7 @@ class VPlotApp(tk.Tk):
         self._auto_render()
 
     def _on_marker(self, key):
-        self.markers[key] = MARKERS[self.markvars[key].get()]
+        self.markers[key] = STYLES[self.markvars[key].get()]
         self._auto_render()
 
     def _apply_name(self, key):
@@ -405,6 +660,9 @@ class VPlotApp(tk.Tk):
         )
         if path:
             self.src_var.set(path)
+            # surface any comparison sources in the new file right away
+            self._discover(path)
+            self._sync_style_rows()
 
     def _clear_canvas(self):
         if self.toolbar is not None:
@@ -422,11 +680,15 @@ class VPlotApp(tk.Tk):
         vc.COL.update(self.colors)
         vc.MARK.update(self.markers)
         vc.LABEL.update(self.names)   # editable legend tags
+        vc.SHOW.update({k: v.get() for k, v in self.showvars.items()})  # per-series on/off
         vc.SHOW_YERR = self.show_yerr.get()   # error-bar visibility toggles
         vc.SHOW_XERR = self.show_xerr.get()
         vc.DPI = self._parse_dpi()            # export resolution
         vc.FIGSIZE = self._parse_figsize()    # figure size (in), None => default
+        vc.SINGLE = self.single_var.get()     # which quantity the single plot draws
         self._collect_bounds()          # push axis bounds into vc.XLIM / vc.YLIM
+        self._collect_ylabels()         # push per-panel y-axis labels into vc.YLABEL
+        self._collect_legend()          # push legend position + columns into vc
 
         try:
             fig = module.main(path=path, show=False)
@@ -434,6 +696,10 @@ class VPlotApp(tk.Tk):
             messagebox.showerror("Plot failed", str(exc))
             self.status.set(f"Error: {exc}")
             return
+
+        # a newly-loaded workbook may have introduced comparison sources -
+        # give each one its own style row (preserving existing choices).
+        self._sync_style_rows()
 
         self._clear_canvas()
         self.current_fig = fig
@@ -446,6 +712,9 @@ class VPlotApp(tk.Tk):
         # the on-screen plot visibly scales with the entered dimensions.  No
         # fill/expand => the packer keeps the canvas at its requested pixel size.
         self.canvas.get_tk_widget().pack(anchor="center", pady=6)
+        # legend drag: report the dropped position back into the X/Y boxes
+        self.canvas.mpl_connect("button_press_event", self._on_canvas_press)
+        self.canvas.mpl_connect("button_release_event", self._on_canvas_release)
         w_cm = fig.get_size_inches()[0] * vc.CM_PER_IN
         h_cm = fig.get_size_inches()[1] * vc.CM_PER_IN
         self.status.set(
