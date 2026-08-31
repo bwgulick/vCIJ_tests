@@ -37,20 +37,20 @@ def _draw_panel(ax, df, key, ck_col, fs_col, ncrt_col, poly_col, poly_err):
     if vc.visible("CK"):
         x, y, ye, xe = vc.series_xy(df, "P EXP", ck_col, yerrcol=ncrt_col, xerrcol="ncrt P")
         vc.draw_pts(ax, x, y, yerr=ye, xerr=xe, color=vc.COL["CK"],
-                    marker=vc.MARK["CK"], label=vc.LABEL["CK"])
+                    marker=vc.MARK["CK"], label=vc.LABEL["CK"], key="CK")
 
     # --- FS ---
     if vc.visible("FS"):
         x, y, ye, xe = vc.series_xy(df, "P FS", fs_col, yerrcol=ncrt_col, xerrcol="ncrt P")
         vc.draw_pts(ax, x, y, yerr=ye, xerr=xe, color=vc.COL["FS"],
-                    marker=vc.MARK["FS"], label=vc.LABEL["FS"])
+                    marker=vc.MARK["FS"], label=vc.LABEL["FS"], key="FS")
 
     # --- poly (Kpoly / Gpoly) at its own single pressure ---
     if vc.visible("poly"):
         x, y, ye, xe = vc.series_xy(df, "Ppoly", poly_col,
                                     yerrcol=poly_err, xerrcol="ncrt Ppoly")
         vc.draw_pts(ax, x, y, yerr=ye, xerr=xe, color=vc.COL["poly"],
-                    marker=vc.MARK["poly"], label=vc.LABEL["poly"])
+                    marker=vc.MARK["poly"], label=vc.LABEL["poly"], key="poly")
 
     # --- literature / comparison series for this quantity (markers only) ---
     # drawn only where the source reports this modulus (K / GH).
@@ -63,7 +63,8 @@ def _draw_panel(ax, df, key, ck_col, fs_col, ncrt_col, poly_col, poly_err):
         x, y, _, _ = vc.series_xy(df, cfg["xcol"], ycol)   # no error columns
         if x.size == 0:
             continue
-        vc.draw_pts(ax, x, y, color=vc.COL[k], marker=vc.MARK[k], label=vc.LABEL[k])
+        vc.draw_pts(ax, x, y, color=vc.COL[k], marker=vc.MARK[k],
+                    label=vc.LABEL[k], key=k)
 
     ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
     ax.margins(y=0.15)

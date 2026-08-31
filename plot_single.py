@@ -48,14 +48,16 @@ def main(path=None, show=False):
         x, y, ye, xe = vc.series_xy(
             df, "P EXP", f"{key} CK", yerrcol=ncrt_y, xerrcol=xe_shared)
         vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
-                    color=vc.COL["CK"], marker=vc.MARK["CK"], label=vc.LABEL["CK"])
+                    color=vc.COL["CK"], marker=vc.MARK["CK"],
+                    label=vc.LABEL["CK"], key="CK")
 
     # --- FS (finite strain) ---
     if vc.visible("FS") and f"{key} FS" in df.columns:
         x, y, ye, xe = vc.series_xy(
             df, "P FS", f"{key} FS", yerrcol=ncrt_y, xerrcol=xe_shared)
         vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
-                    color=vc.COL["FS"], marker=vc.MARK["FS"], label=vc.LABEL["FS"])
+                    color=vc.COL["FS"], marker=vc.MARK["FS"],
+                    label=vc.LABEL["FS"], key="FS")
 
     # --- poly overlay (K -> Kpoly, GH -> Gpoly only) ---
     if poly_col and vc.visible("poly") and poly_col in df.columns:
@@ -64,7 +66,8 @@ def main(path=None, show=False):
         x, y, ye, xe = vc.series_xy(
             df, "Ppoly", poly_col, yerrcol=pe, xerrcol=xep)
         vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
-                    color=vc.COL["poly"], marker=vc.MARK["poly"], label=vc.LABEL["poly"])
+                    color=vc.COL["poly"], marker=vc.MARK["poly"],
+                    label=vc.LABEL["poly"], key="poly")
 
     # --- literature / comparison series (markers only, no error bars) ---
     for k, cfg in vc.LIT_SERIES.items():
@@ -77,7 +80,8 @@ def main(path=None, show=False):
         if x.size == 0:
             continue                          # column present but empty
         vc.draw_pts(ax, x, y,
-                    color=vc.COL[k], marker=vc.MARK[k], label=vc.LABEL[k])
+                    color=vc.COL[k], marker=vc.MARK[k],
+                    label=vc.LABEL[k], key=k)
 
     ax.set_ylabel(vc.ylabel_for(key, ylab), fontsize=12 * s)
     ax.set_xlabel("Pressure (GPa)", fontsize=12 * s)

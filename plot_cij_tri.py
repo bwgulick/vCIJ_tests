@@ -44,14 +44,16 @@ def main(path=None, show=False):
             x, y, ye, xe = vc.series_xy(
                 df, "P EXP", f"{key} CK", yerrcol=ncrt, xerrcol="ncrt P")
             vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
-                        color=vc.COL["CK"], marker=vc.MARK["CK"], label=vc.LABEL["CK"])
+                        color=vc.COL["CK"], marker=vc.MARK["CK"],
+                        label=vc.LABEL["CK"], key="CK")
 
         # --- FS (finite strain) ---
         if vc.visible("FS"):
             x, y, ye, xe = vc.series_xy(
                 df, "P FS", f"{key} FS", yerrcol=ncrt, xerrcol="ncrt P")
             vc.draw_pts(ax, x, y, yerr=ye, xerr=xe,
-                        color=vc.COL["FS"], marker=vc.MARK["FS"], label=vc.LABEL["FS"])
+                        color=vc.COL["FS"], marker=vc.MARK["FS"],
+                        label=vc.LABEL["FS"], key="FS")
 
         # --- literature / comparison series (markers only, no error bars) ---
         # drawn per panel only where that source reports the constant.
@@ -65,7 +67,8 @@ def main(path=None, show=False):
             if x.size == 0:
                 continue                      # column present but empty
             vc.draw_pts(ax, x, y,
-                        color=vc.COL[k], marker=vc.MARK[k], label=vc.LABEL[k])
+                        color=vc.COL[k], marker=vc.MARK[k],
+                        label=vc.LABEL[k], key=k)
 
         ax.set_ylabel(vc.ylabel_for(key, ylab), fontsize=12 * s)
         ax.tick_params(axis="both", labelsize=10 * s)

@@ -31,11 +31,13 @@ import vplot_common as vc
 import plot_cij_tri
 import plot_moduli_dual
 import plot_single
+import plot_vv0
 
 FIGURES = {
     "Cij tri-plot (C11 / C12 / C44) - CK vs FS": plot_cij_tri,
     "Moduli dual (K / GH) - CK vs FS + poly":    plot_moduli_dual,
     "Single element (pick one) - CK vs FS + poly": plot_single,
+    "V/V0 vs P - data + Ding et al. 2007 (BM3)":   plot_vv0,
 }
 
 # core series key -> friendly label shown in the style panel.  Comparison
@@ -45,6 +47,8 @@ CORE_SERIES = [
     ("CK",   "CK (Cook)"),
     ("FS",   "FS (finite strain)"),
     ("poly", "poly (Kpoly / Gpoly)"),
+    ("vv0",  "V/V0 data (this study)"),
+    ("ding", "Ding 2007 (BM3 curve)"),
 ]
 
 # friendly marker name -> matplotlib marker code
@@ -77,6 +81,12 @@ class VPlotApp(tk.Tk):
         self.canvas = None
         self.toolbar = None
 
+        # Route the window's X through the same hard shutdown as the Force Quit
+        # button, so closing the window can never leave a half-dead process
+        # (open figures / a live event loop) lingering in the background and
+        # blocking the next launch.
+        self.protocol("WM_DELETE_WINDOW", self._force_quit)
+
         # Discover comparison sources from the default workbook up front, so
         # their style rows are present before the first render.  Safe if the
         # file is missing - the rows just appear after the first successful plot.
@@ -87,6 +97,9 @@ class VPlotApp(tk.Tk):
         self.colors = dict(vc.COL)
         self.markers = dict(vc.MARK)
         self.names = dict(vc.LABEL)   # editable legend tags (CK / FS / PC)
+        # per-series draw order (higher = on top); seeded from the module
+        # default and kept across style-row rebuilds, like colours/markers.
+        self.zorders = dict(vc.ZORDER)
         # error-bar visibility toggles (all-vertical / all-horizontal)
         self.show_yerr = tk.BooleanVar(value=vc.SHOW_YERR)
         self.show_xerr = tk.BooleanVar(value=vc.SHOW_XERR)
@@ -105,6 +118,7 @@ class VPlotApp(tk.Tk):
         self.hexvars = {}
         self.swatches = {}
         self.markvars = {}
+        self.zordervars = {}     # per-series "Layer" (z-order) entry vars
         self.namevars = {}
         self.showvars = {}       # per-series "plot this dataset?" checkboxes
         self.show_state = {}     # remembered show/hide across style-row rebuilds
@@ -166,6 +180,15 @@ class VPlotApp(tk.Tk):
         ttk.Button(bar, text="Plot", command=self.render).pack(side=tk.LEFT)
         ttk.Button(bar, text="Save PNG...", command=self.save).pack(
             side=tk.LEFT, padx=(6, 0))
+
+        # Hard shutdown button - guarantees the whole process dies (matplotlib
+        # canvases, the Tk event loop, any in-flight render) instead of the
+        # partial teardown the window's X can leave running in the background.
+        # Sits at the far right, coloured so it's unmistakable.
+        tk.Button(bar, text="Force Quit", command=self._force_quit,
+                  bg="#c0392b", fg="white",
+                  activebackground="#e74c3c", activeforeground="white").pack(
+            side=tk.RIGHT)
 
         # data-source row
         srcbar = ttk.Frame(self, padding=(8, 0, 8, 8))
@@ -231,11 +254,12 @@ class VPlotApp(tk.Tk):
             w.destroy()
         self.hexvars, self.swatches = {}, {}
         self.markvars, self.namevars, self.showvars = {}, {}, {}
+        self.zordervars = {}
 
         # column headers
         for c, txt in enumerate(
                 ("Show", "Series", "Legend name", "Colour", "Hex / name",
-                 "Marker / line")):
+                 "Marker / line", "Layer")):
             ttk.Label(frame, text=txt).grid(row=0, column=c, padx=6, sticky="w")
 
         # one row per series (core + auto-discovered sources)
@@ -244,6 +268,7 @@ class VPlotApp(tk.Tk):
             self.colors.setdefault(key, vc.COL.get(key, "#000000"))
             self.markers.setdefault(key, vc.MARK.get(key, "o"))
             self.names.setdefault(key, vc.LABEL.get(key, key))
+            self.zorders.setdefault(key, vc.ZORDER.get(key, vc.DEFAULT_ZORDER))
 
             # visibility checkbox - unchecked drops the whole dataset from the plot
             sv = tk.BooleanVar(value=self.show_state.get(key, vc.visible(key)))
@@ -279,6 +304,16 @@ class VPlotApp(tk.Tk):
             mcb.grid(row=i, column=5, padx=6, pady=2, sticky="w")
             mcb.bind("<<ComboboxSelected>>", lambda e, k=key: self._on_marker(k))
             self.markvars[key] = mv
+
+            # Layer (z-order): higher draws on top.  Type a value or use the
+            # arrows; larger numbers lift the series above the rest.
+            zv = tk.StringVar(value=str(self.zorders[key]))
+            zsb = ttk.Spinbox(frame, from_=0, to=999, width=5, textvariable=zv,
+                              command=lambda k=key: self._apply_zorder(k))
+            zsb.grid(row=i, column=6, padx=6, pady=2, sticky="w")
+            zsb.bind("<Return>",   lambda e, k=key: self._apply_zorder(k))
+            zsb.bind("<FocusOut>", lambda e, k=key: self._apply_zorder(k))
+            self.zordervars[key] = zv
 
             self._set_color(key, self.colors[key])   # paint the swatch
 
@@ -637,6 +672,18 @@ class VPlotApp(tk.Tk):
         self.markers[key] = STYLES[self.markvars[key].get()]
         self._auto_render()
 
+    def _apply_zorder(self, key):
+        """Store an edited layer (z-order); bad/blank text reverts to current."""
+        try:
+            z = int(float(self.zordervars[key].get().strip()))
+        except (ValueError, AttributeError):
+            self.zordervars[key].set(str(self.zorders[key]))   # revert
+            return
+        if z != self.zorders[key]:
+            self.zorders[key] = z
+            self.zordervars[key].set(str(z))                   # normalise text
+            self._auto_render()
+
     def _apply_name(self, key):
         """Store an edited legend tag; blank reverts to the current value."""
         val = self.namevars[key].get().strip()
@@ -664,6 +711,36 @@ class VPlotApp(tk.Tk):
             self._discover(path)
             self._sync_style_rows()
 
+    def _force_quit(self):
+        """Really shut everything down.
+
+        The window's X and a plain ``mainloop`` exit can leave the process
+        alive in the background - open matplotlib figures, a canvas timer, or
+        a stray render still hold references, so ``python.exe`` keeps running,
+        stays out of the taskbar, and blocks the next launch.  This tears the
+        GUI down and then calls ``os._exit``, which terminates the interpreter
+        (and every thread it owns) immediately, skipping the atexit/cleanup
+        handlers that can otherwise hang.  Nothing survives it.
+        """
+        # best-effort graceful teardown first (ignored if already gone)
+        try:
+            import matplotlib.pyplot as plt
+            plt.close("all")           # drop every open figure
+        except Exception:
+            pass
+        try:
+            self._clear_canvas()       # destroy the embedded canvas + toolbar
+        except Exception:
+            pass
+        try:
+            self.quit()                # break out of mainloop
+            self.destroy()             # tear down all widgets
+        except Exception:
+            pass
+        # hard stop: guarantees the process (and any non-daemon thread) exits
+        # now, so nothing is left running in the background.
+        os._exit(0)
+
     def _clear_canvas(self):
         if self.toolbar is not None:
             self.toolbar.destroy()
@@ -680,6 +757,7 @@ class VPlotApp(tk.Tk):
         vc.COL.update(self.colors)
         vc.MARK.update(self.markers)
         vc.LABEL.update(self.names)   # editable legend tags
+        vc.ZORDER.update(self.zorders)   # per-series draw order (higher = on top)
         vc.SHOW.update({k: v.get() for k, v in self.showvars.items()})  # per-series on/off
         vc.SHOW_YERR = self.show_yerr.get()   # error-bar visibility toggles
         vc.SHOW_XERR = self.show_xerr.get()

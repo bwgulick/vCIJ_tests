@@ -146,6 +146,25 @@ def visible(key):
     return SHOW.get(key, True)
 
 # ----------------------------------------------------------------------
+# Per-series draw order (z-order), set live by the GUI.  HIGHER draws on
+# top; series that share a value fall back to draw order (later = on top).
+# Keyed the same as COL / MARK / LABEL (CK / FS / poly / vv0 / ding + each
+# literature tag).  A missing key falls back to DEFAULT_ZORDER via
+# zorder_for(), so the stack is unchanged until the user picks a layer.
+# The plot scripts pass the series key to draw_pts, which looks it up here.
+# ----------------------------------------------------------------------
+DEFAULT_ZORDER = 4
+ZORDER = {}
+
+
+def zorder_for(key):
+    """Draw z-order for series `key` (higher = on top); default if unset."""
+    try:
+        return int(ZORDER.get(key, DEFAULT_ZORDER))
+    except (TypeError, ValueError):
+        return DEFAULT_ZORDER
+
+# ----------------------------------------------------------------------
 # Single-quantity registry for the "Single element" figure.  Maps a quantity
 # key to (default y-axis label, poly value col or None, poly ncrt col or None).
 # For every quantity the CK/FS columns are "<key> CK" / "<key> FS" and the
@@ -413,7 +432,8 @@ def series_xy(df, xcol, ycol, yerrcol=None, xerrcol=None):
 LINE_STYLES = {"-", "--", ":", "-."}
 
 
-def draw_pts(ax, x, y, yerr=None, xerr=None, *, color, marker="o", label=None):
+def draw_pts(ax, x, y, yerr=None, xerr=None, *, color, marker="o", label=None,
+             key=None):
     """Draw one series as markers, OR as a connecting line.
 
     If `marker` is a matplotlib line-style code ("-", "--", ":", "-.") the
@@ -421,9 +441,14 @@ def draw_pts(ax, x, y, yerr=None, xerr=None, *, color, marker="o", label=None):
     the line reads left-to-right); otherwise it is drawn as markers with no
     connecting line, exactly as before.  SHOW_YERR / SHOW_XERR gate the
     vertical / horizontal error bars in both cases.  Markers carry no edge.
+
+    `key` is the series key (CK / FS / vv0 / ...).  Its GUI-chosen z-order
+    (higher = drawn on top) is looked up via zorder_for(); pass None to keep
+    the default depth.
     """
     ye = yerr if SHOW_YERR else None
     xe = xerr if SHOW_XERR else None
+    z = zorder_for(key)
 
     if marker in LINE_STYLES:
         order = np.argsort(x)               # a line must read left-to-right
@@ -434,7 +459,7 @@ def draw_pts(ax, x, y, yerr=None, xerr=None, *, color, marker="o", label=None):
             x, y, yerr=ye, xerr=xe,
             fmt=marker, color=color,
             linewidth=1.8 * SCALE, capsize=4 * SCALE, elinewidth=1.2 * SCALE,
-            zorder=4, label=label,
+            zorder=z, label=label,
         )
         return
 
@@ -442,7 +467,7 @@ def draw_pts(ax, x, y, yerr=None, xerr=None, *, color, marker="o", label=None):
         x, y, yerr=ye, xerr=xe,
         fmt=marker, color=color,
         markersize=6 * SCALE, capsize=4 * SCALE, elinewidth=1.2 * SCALE,
-        markeredgewidth=0, zorder=4, label=label,
+        markeredgewidth=0, zorder=z, label=label,
     )
 
 

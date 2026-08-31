@@ -58,7 +58,7 @@ def main(path=None, show=False):
     if vc.visible("vv0") and P.size:
         vc.draw_pts(ax, P, vv0, yerr=sig, xerr=sigP,
                     color=vc.COL["vv0"], marker=vc.MARK["vv0"],
-                    label=vc.LABEL["vv0"])
+                    label=vc.LABEL["vv0"], key="vv0")
 
     # --- Ding et al. 2007 BM3 reference curve, over the data's pressure span ---
     if vc.visible("ding"):
@@ -66,7 +66,7 @@ def main(path=None, show=False):
         cx, cy = _ding_curve(pmax if pmax > 0 else 150.0)
         lab = f"{vc.LABEL['ding']} ($K_0$={K0_DING:.0f}, $K'$={KP_DING:.1f})"
         vc.draw_pts(ax, cx, cy, color=vc.COL["ding"],
-                    marker=vc.MARK["ding"], label=lab)
+                    marker=vc.MARK["ding"], label=lab, key="ding")
 
     ax.set_ylabel(vc.ylabel_for("V/V0", "$V/V_0$"), fontsize=12 * s)
     ax.set_xlabel("Pressure (GPa)", fontsize=12 * s)
