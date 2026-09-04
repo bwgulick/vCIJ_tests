@@ -90,6 +90,7 @@ class PEOApp(tk.Tk):
         self.order = tk.IntVar(value=DEF_ORDER)
         self.filter_on = tk.BooleanVar(value=True)
         self.interf_mode = tk.StringVar(value="sum")   # "sum" or "diff"
+        self.zoom_on = tk.BooleanVar(value=False)      # box-zoom mode armed?
 
         self.records = []        # list of (freq_MHz, travel_time_us)
 
@@ -190,8 +191,21 @@ class PEOApp(tk.Tk):
                         variable=self.interf_mode, command=self.redraw).pack(anchor="w")
         ttk.Radiobutton(f_int, text="Difference (orig-copy)", value="diff",
                         variable=self.interf_mode, command=self.redraw).pack(anchor="w")
-        ttk.Button(f_int, text="Reset view",
-                   command=self.reset_view).pack(fill=tk.X, pady=(2, 0))
+
+        # --- view / zoom ---
+        f_view = ttk.LabelFrame(bar, text="View / zoom", padding=4)
+        f_view.pack(side=tk.LEFT, fill=tk.Y, padx=3)
+        ttk.Checkbutton(f_view, text="Box zoom (drag)", variable=self.zoom_on,
+                        command=self.toggle_zoom).grid(row=0, column=0, columnspan=2,
+                                                       sticky="w")
+        ttk.Label(f_view, text="Y axis").grid(row=1, column=0, columnspan=2, sticky="w")
+        ttk.Button(f_view, text="Y out", width=6,
+                   command=lambda: self.zoom_y(1.25)).grid(row=2, column=0)
+        ttk.Button(f_view, text="Y in", width=6,
+                   command=lambda: self.zoom_y(0.80)).grid(row=2, column=1)
+        ttk.Button(f_view, text="Reset view",
+                   command=self.reset_view).grid(row=3, column=0, columnspan=2,
+                                                 sticky="ew", pady=(2, 0))
 
         # --- record ---
         f_rec = ttk.LabelFrame(bar, text="Travel-time records", padding=4)
@@ -215,36 +229,100 @@ class PEOApp(tk.Tk):
         self.readout.pack(side=tk.TOP, fill=tk.X, padx=8, pady=2)
 
     def _build_plots(self):
-        self.fig = Figure(figsize=(11, 6.4), tight_layout=True)
-        self.ax_top = self.fig.add_subplot(211)
-        self.ax_bot = self.fig.add_subplot(212, sharex=self.ax_top)
+        # Two separate figures inside a vertical PanedWindow: drag the sash
+        # between them up/down to change the height split (e.g. 80% overlap /
+        # 20% sum).  The x-axes are linked manually (see _on_top_xlim).
+        self.paned = ttk.PanedWindow(self, orient=tk.VERTICAL)
+        self.paned.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
+        # --- top figure: overlay ------------------------------------------
+        top_frame = ttk.Frame(self.paned)
+        self.fig_top = Figure(figsize=(11, 4.4), tight_layout=True)
+        self.ax_top = self.fig_top.add_subplot(111)
         self.ax_top.set_ylabel("amplitude")
         self.ax_top.set_title("PEO overlay - original (blue) + movable copy (red)")
-        self.ax_bot.set_ylabel("interference")
-        self.ax_bot.set_xlabel("time (us)")
-
         (self.ln_orig,) = self.ax_top.plot([], [], color="tab:blue", lw=0.8,
                                            label="original")
         (self.ln_copy,) = self.ax_top.plot([], [], color="tab:red", lw=0.8,
                                            alpha=0.8, label="copy (shifted)")
-        (self.ln_int,)  = self.ax_bot.plot([], [], color="tab:purple", lw=0.8)
         self.ax_top.legend(loc="upper right", fontsize=8)
         self.ax_top.grid(True, alpha=0.3)
+        self.canvas_top = FigureCanvasTkAgg(self.fig_top, master=top_frame)
+        self.canvas_top.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        NavigationToolbar2Tk(self.canvas_top, top_frame)  # pan / home / save
+        self.paned.add(top_frame, weight=4)               # ~80% of extra space
+
+        # --- bottom figure: interference ----------------------------------
+        bot_frame = ttk.Frame(self.paned)
+        self.fig_bot = Figure(figsize=(11, 2.0), tight_layout=True)
+        self.ax_bot = self.fig_bot.add_subplot(111)
+        self.ax_bot.set_ylabel("interference")
+        self.ax_bot.set_xlabel("time (us)")
+        (self.ln_int,) = self.ax_bot.plot([], [], color="tab:purple", lw=0.8)
         self.ax_bot.grid(True, alpha=0.3)
+        self.canvas_bot = FigureCanvasTkAgg(self.fig_bot, master=bot_frame)
+        self.canvas_bot.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        self.paned.add(bot_frame, weight=1)               # ~20%
 
-        canvas_frame = ttk.Frame(self)
-        canvas_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-        self.canvas = FigureCanvasTkAgg(self.fig, master=canvas_frame)
-        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-        NavigationToolbar2Tk(self.canvas, canvas_frame)  # pan / zoom / home
+        # keep the two x-axes in sync (separate figures -> link manually)
+        self._syncing_x = False
+        self.ax_top.callbacks.connect("xlim_changed", self._on_top_xlim)
 
-        # click-drag a box on the top axis to zoom (no visible selection box)
+        # box-zoom on the top axis; armed/disarmed by the "Box zoom" toggle
         self.selector = RectangleSelector(
             self.ax_top, self.on_box_zoom, useblit=True, button=[1],
             interactive=False, spancoords="data",
-            props=dict(facecolor="none", edgecolor="none", fill=False, alpha=0.0),
+            props=dict(facecolor="tab:orange", edgecolor="tab:orange",
+                       fill=True, alpha=0.15, linestyle="--", linewidth=1.0),
         )
+        self.selector.set_active(False)
+
+        # set the initial 80/20 split once the panes have a real size
+        self.after(200, self._init_sash)
+
+    def _init_sash(self):
+        try:
+            h = self.paned.winfo_height()
+            if h > 1:
+                self.paned.sashpos(0, int(h * 0.75))
+        except Exception:
+            pass
+
+    def _draw_all(self):
+        self.canvas_top.draw_idle()
+        self.canvas_bot.draw_idle()
+
+    def _on_top_xlim(self, ax):
+        """Mirror the top panel's x-range onto the bottom panel."""
+        if self._syncing_x:
+            return
+        self._syncing_x = True
+        try:
+            self.ax_bot.set_xlim(ax.get_xlim())
+            self.canvas_bot.draw_idle()
+        finally:
+            self._syncing_x = False
+
+    # ==================================================================
+    # view / zoom controls
+    # ==================================================================
+    def toggle_zoom(self):
+        """Arm/disarm the drag-box zoom on the overlay panel."""
+        self.selector.set_active(self.zoom_on.get())
+
+    def zoom_y(self, factor):
+        """Zoom the overlay's amplitude (y) axis about its centre.
+
+        factor > 1 zooms *out* (wider y-range -> tall signal fits);
+        factor < 1 zooms *in* (narrower y-range -> signal grows taller).
+        """
+        lo, hi = self.ax_top.get_ylim()
+        mid = 0.5 * (lo + hi)
+        half = 0.5 * (hi - lo) * factor
+        if half <= 0:
+            return
+        self.ax_top.set_ylim(mid - half, mid + half)
+        self.canvas_top.draw_idle()
 
     # ==================================================================
     # data loading / filtering
@@ -354,7 +432,7 @@ class PEOApp(tk.Tk):
         self.readout.config(
             text=f"Travel time: {sh:.4f} us   |   orig amp x{yo:.3f}"
                  f"   copy amp x{ys:.3f}   |   {self.filename}")
-        self.canvas.draw_idle()
+        self._draw_all()
 
     def reset_view(self):
         if self.t_us is None:
@@ -362,7 +440,7 @@ class PEOApp(tk.Tk):
         self.ax_top.set_xlim(self.t_us.min(), self.t_us.max())
         self.ax_top.relim(); self.ax_top.autoscale(axis="y")
         self.ax_bot.relim(); self.ax_bot.autoscale(axis="y")
-        self.canvas.draw_idle()
+        self._draw_all()
 
     # ==================================================================
     # box zoom (click-drag on top panel)
@@ -374,10 +452,10 @@ class PEOApp(tk.Tk):
         y0, y1 = sorted((eclick.ydata, erelease.ydata))
         if x1 - x0 <= 0 or y1 - y0 <= 0:
             return
-        self.ax_top.set_xlim(x0, x1)       # shared x -> bottom panel follows
+        self.ax_top.set_xlim(x0, x1)       # xlim_changed -> bottom x follows
         self.ax_top.set_ylim(y0, y1)
         self.ax_bot.relim(); self.ax_bot.autoscale(axis="y")
-        self.canvas.draw_idle()
+        self._draw_all()
 
     # ==================================================================
     # records
