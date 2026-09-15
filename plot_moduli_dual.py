@@ -85,11 +85,13 @@ def main(path=None, show=False):
     _draw_panel(ax1, df, k_key, k_ck, k_fs, k_ncrt, k_pcol, k_perr)
     _draw_panel(ax2, df, g_key, g_ck, g_fs, g_ncrt, g_pcol, g_perr)
 
-    ax1.set_ylabel(vc.ylabel_for(k_key, k_ylab), fontsize=12 * s)
-    ax2.set_ylabel(vc.ylabel_for(g_key, g_ylab), fontsize=12 * s)
-    ax2.set_xlabel("Pressure (GPa)", fontsize=12 * s)
-    ax1.tick_params(axis="both", labelsize=10 * s)
-    ax2.tick_params(axis="both", labelsize=10 * s)
+    ax1.set_ylabel(vc.ylabel_for(k_key, k_ylab),
+                   fontsize=12 * s * vc.AXIS_FONT_SCALE)
+    ax2.set_ylabel(vc.ylabel_for(g_key, g_ylab),
+                   fontsize=12 * s * vc.AXIS_FONT_SCALE)
+    ax2.set_xlabel("Pressure (GPa)", fontsize=12 * s * vc.AXIS_FONT_SCALE)
+    ax1.tick_params(axis="both", labelsize=10 * s * vc.AXIS_FONT_SCALE)
+    ax2.tick_params(axis="both", labelsize=10 * s * vc.AXIS_FONT_SCALE)
 
     # GUI-set bounds (blank => auto); sharex propagates the x limits
     vc.apply_ylim(ax1, k_key)

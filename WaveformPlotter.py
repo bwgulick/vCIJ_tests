@@ -258,8 +258,11 @@ class WaveformPlotter(tk.Tk):
                                                   sticky="ew", pady=(4, 0))
 
     def _build_plot(self):
+        # Display at a fixed dpi so on-screen pixels == inches * dpi. This is
+        # what makes the width/height controls actually change what you see
+        # (WYSIWYG) instead of the figure just filling the window.
         self.fig = Figure(figsize=(self.fig_w.get(), self.fig_h.get()),
-                          tight_layout=True)
+                          dpi=100, tight_layout=True)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_xlabel(self.xlabel.get())
         self.ax.set_ylabel(self.ylabel.get())
@@ -269,7 +272,11 @@ class WaveformPlotter(tk.Tk):
         frame = ttk.Frame(self)
         frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
         self.canvas = FigureCanvasTkAgg(self.fig, master=frame)
-        self.canvas.get_tk_widget().pack(side=tk.TOP, fill=tk.BOTH, expand=True)
+        # Do NOT fill/stretch the canvas. Let it sit at the figure's true size
+        # (centred in the frame) so what you see is exactly what gets saved.
+        # If we stretched it, matplotlib would resize the figure to the widget
+        # on every window resize and the size controls would have no effect.
+        self.canvas.get_tk_widget().pack(side=tk.TOP, expand=True)
         self.toolbar = NavigationToolbar2Tk(self.canvas, frame)
 
         # create the always-present labels + panel letter, then make draggable
@@ -357,9 +364,19 @@ class WaveformPlotter(tk.Tk):
             w, h = float(self.fig_w.get()), float(self.fig_h.get())
         except (tk.TclError, ValueError):
             return
-        if w > 0 and h > 0:
-            self.fig.set_size_inches(w, h, forward=True)
-            self.canvas.draw_idle()
+        if w <= 0 or h <= 0:
+            return
+        # set the figure size in inches, then resize the *Tk widget* to the
+        # matching pixel size. On an embedded canvas set_size_inches alone does
+        # NOT resize the widget, which left the old (larger) render painted
+        # next to the new one - the "overlay". forward=False avoids poking the
+        # window manager; the explicit widget resize + full draw() is what
+        # actually updates and clears the canvas.
+        self.fig.set_size_inches(w, h, forward=False)
+        dpi = self.fig.get_dpi()
+        self.canvas.get_tk_widget().configure(width=int(round(w * dpi)),
+                                              height=int(round(h * dpi)))
+        self.canvas.draw()
 
     def reset_label_positions(self):
         for art, (_, fx, fy) in zip(self.label_artists, DEFAULT_LABELS):
@@ -455,7 +472,11 @@ class WaveformPlotter(tk.Tk):
         except (tk.TclError, ValueError):
             dpi = 600
         try:
-            self.fig.savefig(path, dpi=dpi, bbox_inches="tight")
+            # No bbox_inches="tight": it recrops to a different bounding box
+            # than the one on screen (shifting the axes under the labels),
+            # which is why saved figures didn't match the view. Save exactly
+            # the figure as displayed.
+            self.fig.savefig(path, dpi=dpi)
         except Exception as exc:
             messagebox.showerror("Save figure", str(exc))
             return

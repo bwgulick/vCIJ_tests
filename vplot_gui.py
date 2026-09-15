@@ -71,12 +71,21 @@ LINE_STYLES = {
 STYLES = {**MARKERS, **LINE_STYLES}
 MARKER_BY_CODE = {v: k for k, v in STYLES.items()}
 
+# how a line-drawn series shows its uncertainty (global; pushed into
+# vc.LINE_UNC before each render).  friendly name -> stored code.
+LINE_UNC = {
+    "None": "none",
+    "Error bars": "bars",
+    "Shaded band": "band",
+}
+LINE_UNC_BY_CODE = {v: k for k, v in LINE_UNC.items()}
+
 
 class VPlotApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Vanadium elastic-property plotter")
-        self.geometry("1040x960")
+        self.geometry("1480x1000")
         self.current_fig = None
         self.canvas = None
         self.toolbar = None
@@ -100,13 +109,28 @@ class VPlotApp(tk.Tk):
         # per-series draw order (higher = on top); seeded from the module
         # default and kept across style-row rebuilds, like colours/markers.
         self.zorders = dict(vc.ZORDER)
-        # error-bar visibility toggles (all-vertical / all-horizontal)
+        # error-bar visibility toggles (all-vertical / all-horizontal); these
+        # gate the MARKER series only.  Line series use line_unc_var below.
         self.show_yerr = tk.BooleanVar(value=vc.SHOW_YERR)
         self.show_xerr = tk.BooleanVar(value=vc.SHOW_XERR)
+        # how a line-drawn series shows its uncertainty (None / Error bars /
+        # Shaded band), independent of the marker error-bar toggles.
+        self.line_unc_var = tk.StringVar(
+            value=LINE_UNC_BY_CODE.get(vc.LINE_UNC, "Shaded band"))
         # output resolution + figure size (cm); size blank => module default
         self.dpi_var = tk.StringVar(value=str(vc.DPI))
         self.figw_var = tk.StringVar(value="")
         self.figh_var = tk.StringVar(value="")
+        # on-screen display zoom: scales ONLY how large the figure is drawn in
+        # the right-hand panel (via the canvas screen dpi), never the figure's
+        # true size in inches or the exported file.  2x so the small PRB-sized
+        # figures are legible out of the box.
+        self.zoom_var = tk.StringVar(value="2.0")
+        # font-size multipliers (1.0 = each plot module's default sizes)
+        self.legend_fs_var = tk.StringVar(value="1.0")
+        self.axis_fs_var = tk.StringVar(value="1.0")
+        # PRB size preset selector (fills the Width/Height cm fields on change)
+        self.preset_var = tk.StringVar(value="(custom)")
         # legend placement: X/Y anchor (axes fraction, blank => auto/movable)
         # + column count ("auto" => each plot's own default).  Drag the legend
         # on the canvas to fill X/Y, or type them directly.
@@ -131,27 +155,67 @@ class VPlotApp(tk.Tk):
         self.ylabel_store = {}   # key -> label str, kept across figure switches
 
         self._build_controls()
-        self._build_settings_row()
-        self._build_canvas_area()
+        self._build_main_split()
 
     # ------------------------------------------------------------------
-    # settings row: series style (left) beside axis bounds + error bars
-    # (right), so the controls stay short and the figure gets the height.
+    # main split: all control panels stacked on the LEFT half, the figure
+    # centred on the RIGHT half (grey space above/below is intentional).
+    # The two always-on panels (series style, axis bounds) stay expanded;
+    # the other three (error bars, legend, figure size/DPI) live behind
+    # collapsible "dropdown" headers to keep the left column short.
     # ------------------------------------------------------------------
-    def _build_settings_row(self):
-        row = ttk.Frame(self, padding=(8, 0))
-        row.pack(side=tk.TOP, fill=tk.X)
+    def _build_main_split(self):
+        main = ttk.Frame(self)
+        main.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
-        left = ttk.Frame(row)
-        left.pack(side=tk.LEFT, anchor="n")
-        right = ttk.Frame(row)
-        right.pack(side=tk.LEFT, anchor="n", fill=tk.X, expand=True, padx=(8, 0))
+        # left half: the controls, stacked vertically (natural width)
+        left = ttk.Frame(main, padding=(8, 4))
+        left.pack(side=tk.LEFT, fill=tk.Y, anchor="n")
 
+        # right half: the figure canvas, centred with grey margins
+        right = ttk.Frame(main)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.canvas_frame = right
+
+        # always-visible panels
         self._build_style_panel(left)
-        self._build_bounds_panel(right)
-        self._build_display_panel(right)
-        self._build_legend_panel(right)
-        self._build_output_panel(right)
+        self._build_bounds_panel(left)
+        # collapsible "dropdown" panels (start collapsed)
+        self._build_display_panel(
+            self._make_collapsible(left, "Uncertainty (error bars & bands)"))
+        self._build_legend_panel(self._make_collapsible(left, "Legend"))
+        self._build_fonts_panel(
+            self._make_collapsible(left, "Fonts (legend & axis text)"))
+        self._build_output_panel(
+            self._make_collapsible(left, "Figure size, DPI & screen zoom"))
+
+    # ------------------------------------------------------------------
+    # collapsible section: a full-width header button that shows/hides its
+    # body.  Returns the body frame for the caller to fill.
+    # ------------------------------------------------------------------
+    def _make_collapsible(self, parent, title, expanded=False):
+        outer = ttk.Frame(parent)
+        outer.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
+
+        state = {"open": expanded}
+        hdr_var = tk.StringVar()
+        body = ttk.Frame(outer)
+
+        def refresh():
+            hdr_var.set(("▼  " if state["open"] else "▶  ") + title)
+            if state["open"]:
+                body.pack(side=tk.TOP, fill=tk.X)
+            else:
+                body.forget()
+
+        def toggle():
+            state["open"] = not state["open"]
+            refresh()
+
+        ttk.Button(outer, textvariable=hdr_var, command=toggle,
+                   style="Toolbutton").pack(side=tk.TOP, fill=tk.X)
+        refresh()
+        return body
 
     # ------------------------------------------------------------------
     def _build_controls(self):
@@ -328,21 +392,36 @@ class VPlotApp(tk.Tk):
     # display-options panel (error-bar visibility)
     # ------------------------------------------------------------------
     def _build_display_panel(self, parent):
-        box = ttk.LabelFrame(parent, text="Error bars", padding=8)
-        box.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
-        ttk.Checkbutton(box, text="Show vertical (y) uncertainties",
+        box = ttk.Frame(parent, padding=8)
+        box.pack(side=tk.TOP, fill=tk.X)
+
+        # marker (scatter) series error bars
+        mrow = ttk.Frame(box)
+        mrow.pack(side=tk.TOP, fill=tk.X)
+        ttk.Checkbutton(mrow, text="Show vertical (y) uncertainties",
                         variable=self.show_yerr,
                         command=self._auto_render).pack(side=tk.LEFT, padx=(0, 16))
-        ttk.Checkbutton(box, text="Show horizontal (x) uncertainties",
+        ttk.Checkbutton(mrow, text="Show horizontal (x) uncertainties",
                         variable=self.show_xerr,
                         command=self._auto_render).pack(side=tk.LEFT)
+        ttk.Label(box, text="(the two boxes above apply to point/marker series)"
+                  ).pack(side=tk.TOP, anchor="w", pady=(2, 0))
+
+        # line-drawn series (e.g. a finite-strain fit) uncertainty style
+        lrow = ttk.Frame(box)
+        lrow.pack(side=tk.TOP, fill=tk.X, pady=(6, 0))
+        ttk.Label(lrow, text="Line series uncertainty:").pack(side=tk.LEFT)
+        lcb = ttk.Combobox(lrow, textvariable=self.line_unc_var,
+                           values=list(LINE_UNC), state="readonly", width=14)
+        lcb.pack(side=tk.LEFT, padx=6)
+        lcb.bind("<<ComboboxSelected>>", lambda e: self._auto_render())
 
     # ------------------------------------------------------------------
     # legend panel: position (drag or type) + column count
     # ------------------------------------------------------------------
     def _build_legend_panel(self, parent):
-        box = ttk.LabelFrame(parent, text="Legend", padding=8)
-        box.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
+        box = ttk.Frame(parent, padding=8)
+        box.pack(side=tk.TOP, fill=tk.X)
 
         ttk.Label(box, text="X (0-1):").grid(row=0, column=0, padx=6, pady=2, sticky="w")
         xe = ttk.Entry(box, textvariable=self.leg_x_var, width=8)
@@ -442,12 +521,54 @@ class VPlotApp(tk.Tk):
         self.leg_y_var.set(f"{y1:.3f}")
         vc.LEGEND_XY = (float(x0), float(y1))   # keep it on the next render
 
+    # PRB figure-size presets: label -> fn(gui) -> (width_in, height_in) or
+    # None ("(custom)" clears the size fields so module defaults apply).  The
+    # "(auto)" entries size themselves from the current figure's panel count.
+    _PRESETS = {
+        "(custom)":                        lambda g: None,
+        "PRB single-col — 1 panel":   lambda g: vc.prb_single(),
+        "PRB double-col — 1 panel":   lambda g: vc.prb_double(),
+        "PRB double-col — panels (auto)":
+            lambda g: vc.prb_stacked(g._num_panels()),
+        "PRB single-col — panels (auto)":
+            lambda g: vc.prb_stacked(g._num_panels(), double=False),
+    }
+
     # ------------------------------------------------------------------
-    # output panel: figure size (cm) + export DPI
+    # fonts panel: legend + axis text size multipliers (view + export)
+    # ------------------------------------------------------------------
+    def _build_fonts_panel(self, parent):
+        box = ttk.Frame(parent, padding=8)
+        box.pack(side=tk.TOP, fill=tk.X)
+
+        ttk.Label(box, text="Legend font (x):").grid(
+            row=0, column=0, padx=6, pady=2, sticky="w")
+        lsb = ttk.Spinbox(box, from_=0.4, to=4.0, increment=0.1, width=6,
+                          textvariable=self.legend_fs_var,
+                          command=self._auto_render)
+        lsb.grid(row=0, column=1, padx=6, pady=2, sticky="w")
+
+        ttk.Label(box, text="Axis font (x):").grid(
+            row=0, column=2, padx=6, pady=2, sticky="w")
+        asb = ttk.Spinbox(box, from_=0.4, to=4.0, increment=0.1, width=6,
+                          textvariable=self.axis_fs_var,
+                          command=self._auto_render)
+        asb.grid(row=0, column=3, padx=6, pady=2, sticky="w")
+
+        ttk.Label(box, text="1.0 = default; axis = labels + tick numbers"
+                  ).grid(row=1, column=0, columnspan=4, padx=6, pady=(2, 0),
+                         sticky="w")
+
+        for sb in (lsb, asb):
+            sb.bind("<Return>",   lambda e: self._auto_render())
+            sb.bind("<FocusOut>", lambda e: self._auto_render())
+
+    # ------------------------------------------------------------------
+    # output panel: figure size (cm) + export DPI + on-screen zoom
     # ------------------------------------------------------------------
     def _build_output_panel(self, parent):
-        box = ttk.LabelFrame(parent, text="Figure size & DPI", padding=8)
-        box.pack(side=tk.TOP, fill=tk.X, pady=(0, 6))
+        box = ttk.Frame(parent, padding=8)
+        box.pack(side=tk.TOP, fill=tk.X)
 
         ttk.Label(box, text="Width (cm):").grid(row=0, column=0, padx=6, pady=2, sticky="w")
         we = ttk.Entry(box, textvariable=self.figw_var, width=8)
@@ -464,7 +585,27 @@ class VPlotApp(tk.Tk):
         de = ttk.Entry(box, textvariable=self.dpi_var, width=8)
         de.grid(row=1, column=1, padx=6, pady=2, sticky="w")
 
-        for ent in (we, he, de):
+        # on-screen zoom: view-only magnification of the right-hand canvas.
+        # Does NOT change the figure's true size in cm or the exported file.
+        ttk.Label(box, text="Screen zoom (x):").grid(
+            row=1, column=2, padx=6, pady=2, sticky="w")
+        zsb = ttk.Spinbox(box, from_=0.5, to=5.0, increment=0.25, width=6,
+                          textvariable=self.zoom_var,
+                          command=self._auto_render)
+        zsb.grid(row=1, column=3, padx=6, pady=2, sticky="w")
+
+        ttk.Label(box, text="PRB preset:").grid(
+            row=2, column=0, padx=6, pady=2, sticky="w")
+        pc = ttk.Combobox(box, textvariable=self.preset_var, state="readonly",
+                          width=26, values=list(self._PRESETS))
+        pc.grid(row=2, column=1, columnspan=3, padx=6, pady=2, sticky="w")
+        pc.bind("<<ComboboxSelected>>", self._apply_preset)
+
+        ttk.Label(box, text="(screen zoom is view-only; true size = cm above)"
+                  ).grid(row=3, column=0, columnspan=4, padx=6, pady=(2, 0),
+                         sticky="w")
+
+        for ent in (we, he, de, zsb):
             ent.bind("<Return>",   lambda e: self._auto_render())
             ent.bind("<FocusOut>", lambda e: self._auto_render())
 
@@ -607,6 +748,36 @@ class VPlotApp(tk.Tk):
             return (w / vc.CM_PER_IN, h / vc.CM_PER_IN)
         return None
 
+    def _parse_zoom(self):
+        """On-screen zoom factor from the entry; blank/bad/<=0 -> 1.0."""
+        z = self._to_float(self.zoom_var.get())
+        return z if (z and z > 0) else 1.0
+
+    def _parse_scale(self, var, default=1.0):
+        """A font-size multiplier StringVar -> float; blank/bad/<=0 -> default."""
+        v = self._to_float(var.get())
+        return v if (v and v > 0) else default
+
+    def _num_panels(self):
+        """Number of stacked y-panels in the current figure (>= 1)."""
+        return max(1, sum(1 for _k, _lbl, ylab in self._panel_rows()
+                          if ylab is not None))
+
+    def _apply_preset(self, *_):
+        """Fill the Width/Height (cm) fields from the chosen PRB preset."""
+        fn = self._PRESETS.get(self.preset_var.get())
+        if fn is None:
+            return
+        size_in = fn(self)
+        if size_in is None:                 # "(custom)" -> module default
+            self.figw_var.set("")
+            self.figh_var.set("")
+        else:
+            w_in, h_in = size_in
+            self.figw_var.set(f"{w_in * vc.CM_PER_IN:.2f}")
+            self.figh_var.set(f"{h_in * vc.CM_PER_IN:.2f}")
+        self._auto_render()
+
     def _collect_bounds(self):
         """Push the current bound entries into vc.XLIM / vc.YLIM."""
         vc.XLIM[0], vc.XLIM[1] = None, None
@@ -628,10 +799,6 @@ class VPlotApp(tk.Tk):
             text = lv.get().strip()
             if text:
                 vc.YLABEL[key] = text
-
-    def _build_canvas_area(self):
-        self.canvas_frame = ttk.Frame(self)
-        self.canvas_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
 
     # ------------------------------------------------------------------
     # style callbacks
@@ -759,10 +926,13 @@ class VPlotApp(tk.Tk):
         vc.LABEL.update(self.names)   # editable legend tags
         vc.ZORDER.update(self.zorders)   # per-series draw order (higher = on top)
         vc.SHOW.update({k: v.get() for k, v in self.showvars.items()})  # per-series on/off
-        vc.SHOW_YERR = self.show_yerr.get()   # error-bar visibility toggles
+        vc.SHOW_YERR = self.show_yerr.get()   # marker error-bar toggles
         vc.SHOW_XERR = self.show_xerr.get()
+        vc.LINE_UNC = LINE_UNC.get(self.line_unc_var.get(), "none")  # line series
         vc.DPI = self._parse_dpi()            # export resolution
         vc.FIGSIZE = self._parse_figsize()    # figure size (in), None => default
+        vc.LEGEND_FONT_SCALE = self._parse_scale(self.legend_fs_var)  # legend text
+        vc.AXIS_FONT_SCALE = self._parse_scale(self.axis_fs_var)      # axis text
         vc.SINGLE = self.single_var.get()     # which quantity the single plot draws
         self._collect_bounds()          # push axis bounds into vc.XLIM / vc.YLIM
         self._collect_ylabels()         # push per-panel y-axis labels into vc.YLABEL
@@ -779,6 +949,15 @@ class VPlotApp(tk.Tk):
         # give each one its own style row (preserving existing choices).
         self._sync_style_rows()
 
+        # on-screen zoom: bump ONLY the figure's screen dpi so the canvas is
+        # drawn larger in the right-hand panel.  The figure's true size in
+        # inches (get_size_inches) is untouched, and "Save" passes its own
+        # explicit dpi, so neither the reported dimensions nor the exported
+        # file are affected - this is purely a magnifying glass for viewing.
+        zoom = self._parse_zoom()
+        if zoom != 1.0:
+            fig.set_dpi(fig.get_dpi() * zoom)
+
         self._clear_canvas()
         self.current_fig = fig
         self.canvas = FigureCanvasTkAgg(fig, master=self.canvas_frame)
@@ -788,8 +967,10 @@ class VPlotApp(tk.Tk):
         # WYSIWYG: show the figure at its true size (width_in x height_in x the
         # figure's display dpi) instead of stretching it to fill the window, so
         # the on-screen plot visibly scales with the entered dimensions.  No
-        # fill/expand => the packer keeps the canvas at its requested pixel size.
-        self.canvas.get_tk_widget().pack(anchor="center", pady=6)
+        # fill => the packer keeps the canvas at its requested pixel size;
+        # expand=True donates the leftover right-half space to the canvas's
+        # cavity so anchor="center" leaves grey margins above and below it.
+        self.canvas.get_tk_widget().pack(anchor="center", expand=True, pady=6)
         # legend drag: report the dropped position back into the X/Y boxes
         self.canvas.mpl_connect("button_press_event", self._on_canvas_press)
         self.canvas.mpl_connect("button_release_event", self._on_canvas_release)
@@ -797,7 +978,8 @@ class VPlotApp(tk.Tk):
         h_cm = fig.get_size_inches()[1] * vc.CM_PER_IN
         self.status.set(
             f"Rendered: {self.fig_choice.get()}  "
-            f"({w_cm:.1f} x {h_cm:.1f} cm @ {vc.DPI} dpi)")
+            f"({w_cm:.1f} x {h_cm:.1f} cm @ {vc.DPI} dpi"
+            + (f", shown at {zoom:g}x" if zoom != 1.0 else "") + ")")
 
     def save(self):
         if self.current_fig is None:

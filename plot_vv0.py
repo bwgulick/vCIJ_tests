@@ -68,9 +68,10 @@ def main(path=None, show=False):
         vc.draw_pts(ax, cx, cy, color=vc.COL["ding"],
                     marker=vc.MARK["ding"], label=lab, key="ding")
 
-    ax.set_ylabel(vc.ylabel_for("V/V0", "$V/V_0$"), fontsize=12 * s)
-    ax.set_xlabel("Pressure (GPa)", fontsize=12 * s)
-    ax.tick_params(axis="both", labelsize=10 * s)
+    ax.set_ylabel(vc.ylabel_for("V/V0", "$V/V_0$"),
+                  fontsize=12 * s * vc.AXIS_FONT_SCALE)
+    ax.set_xlabel("Pressure (GPa)", fontsize=12 * s * vc.AXIS_FONT_SCALE)
+    ax.tick_params(axis="both", labelsize=10 * s * vc.AXIS_FONT_SCALE)
     ax.tick_params(axis="both", which="both", direction="in",
                    top=True, right=True)
     ax.yaxis.set_major_locator(MaxNLocator(nbins=6))

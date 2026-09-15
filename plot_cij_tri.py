@@ -70,13 +70,14 @@ def main(path=None, show=False):
                         color=vc.COL[k], marker=vc.MARK[k],
                         label=vc.LABEL[k], key=k)
 
-        ax.set_ylabel(vc.ylabel_for(key, ylab), fontsize=12 * s)
-        ax.tick_params(axis="both", labelsize=10 * s)
+        ax.set_ylabel(vc.ylabel_for(key, ylab),
+                      fontsize=12 * s * vc.AXIS_FONT_SCALE)
+        ax.tick_params(axis="both", labelsize=10 * s * vc.AXIS_FONT_SCALE)
         ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
         ax.margins(y=0.15)
         vc.apply_ylim(ax, key)          # GUI-set y bounds (blank => auto)
 
-    axes[-1].set_xlabel("Pressure (GPa)", fontsize=12 * s)
+    axes[-1].set_xlabel("Pressure (GPa)", fontsize=12 * s * vc.AXIS_FONT_SCALE)
     vc.apply_xlim(axes[-1])             # shared x bounds (sharex propagates)
 
     # single combined legend (dedup handles) on the top panel.  Collect across

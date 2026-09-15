@@ -203,9 +203,25 @@ PALETTES = {
 # ----------------------------------------------------------------------
 # Error-bar visibility, toggled live by the GUI.  When off, that whole
 # family of error bars is dropped from every series on the next render.
+# These two gate the MARKER (scatter) series only; line-drawn series use
+# LINE_UNC below so a fit line's uncertainty is controlled independently
+# (you can keep error bars on the measured points and still show the fit
+# line clean, or as a shaded band).
 # ----------------------------------------------------------------------
-SHOW_YERR = True    # vertical   (y) error bars
-SHOW_XERR = True    # horizontal (x) error bars
+SHOW_YERR = True    # vertical   (y) error bars on marker series
+SHOW_XERR = True    # horizontal (x) error bars on marker series
+
+# How a LINE-drawn series (marker set to "-", "--", ":", "-.") shows its
+# uncertainty, set live by the GUI.  Independent of SHOW_YERR / SHOW_XERR
+# (those stay for the marker series), because a finite-strain fit line is
+# not a set of measured points:
+#   "none" : just the line, no uncertainty drawn
+#   "bars" : error-bar caps at each underlying point (y and x where present)
+#   "band" : a shaded vertical envelope (y +/- yerr) behind the line
+# The measurement sigma is the shared ncrt block (identical for CK and FS),
+# so a band on the FS line and error bars on the CK points show the SAME
+# numbers - usually you want one or the other, not both.
+LINE_UNC = "band"
 
 # ----------------------------------------------------------------------
 # Axis limits, set live by the GUI.  None on either end => autoscale that
@@ -239,6 +255,18 @@ YLABEL = {}
 LEGEND_XY = None
 LEGEND_NCOL = None
 
+# ----------------------------------------------------------------------
+# Font-size multipliers, set live by the GUI.  Each scales the plot modules'
+# base font sizes (which already carry the figure-size SCALE), so the user can
+# enlarge / shrink text without touching the figure dimensions:
+#   LEGEND_FONT_SCALE : applied inside place_legend() to the legend fontsize.
+#   AXIS_FONT_SCALE   : applied to the x/y axis labels AND the tick-label
+#                       sizes in every plot module.
+# 1.0 = each plot's original size.
+# ----------------------------------------------------------------------
+LEGEND_FONT_SCALE = 1.0
+AXIS_FONT_SCALE = 1.0
+
 
 def place_legend(ax, handles, labels, fontsize, *,
                  default_ncol=1, default_loc="best"):
@@ -251,6 +279,7 @@ def place_legend(ax, handles, labels, fontsize, *,
 
     Returns the Legend so the GUI can read back a dragged position.
     """
+    fontsize = fontsize * LEGEND_FONT_SCALE   # GUI legend font-size multiplier
     ncol = max(1, int(LEGEND_NCOL if LEGEND_NCOL else default_ncol))
     if LEGEND_XY is not None:
         leg = ax.legend(handles, labels, fontsize=fontsize, frameon=False,
@@ -286,6 +315,43 @@ SCALE = 1.0
 def figsize_in(default):
     """Return the GUI-chosen figure size (inches), or the module default."""
     return FIGSIZE if FIGSIZE else default
+
+
+# ----------------------------------------------------------------------
+# Physical Review B figure-size presets (inches).
+#   Single-column text width : 3.375 in  (8.6 cm)
+#   Double-column text width : 7.0   in  (17.8 cm)
+#   Max figure height        : ~8.5 in   (leaves room for the caption on a
+#                                          full page; the hard page limit is
+#                                          ~9.25 in).
+# Single-panel heights follow a ~1.35:1 aspect (single-column) and a near
+# golden-ratio ~1.75:1 (double-column).  Stacked panels sharing one x-axis
+# get ~2.3 in per panel plus 0.7 in for the shared bottom axis label.
+# ----------------------------------------------------------------------
+PRB_SINGLE_COL_IN = 3.375
+PRB_DOUBLE_COL_IN = 7.0
+PRB_MAX_HEIGHT_IN = 8.5
+
+
+def prb_single(height=2.5):
+    """PRB single-column size (inches): 3.375 wide x `height` tall."""
+    return (PRB_SINGLE_COL_IN, height)
+
+
+def prb_double(height=4.0):
+    """PRB double-column size (inches): 7.0 wide x `height` tall."""
+    return (PRB_DOUBLE_COL_IN, height)
+
+
+def prb_stacked(n_panels, double=True):
+    """PRB size for `n_panels` stacked panels sharing an x-axis (inches).
+
+    Height ~= 2.3 in per panel + 0.7 in for the shared bottom axis label,
+    clamped to PRB_MAX_HEIGHT_IN so it never overruns the page.
+    """
+    width = PRB_DOUBLE_COL_IN if double else PRB_SINGLE_COL_IN
+    height = min(2.3 * max(1, int(n_panels)) + 0.7, PRB_MAX_HEIGHT_IN)
+    return (width, height)
 
 
 def set_scale(default):
@@ -439,36 +505,61 @@ def draw_pts(ax, x, y, yerr=None, xerr=None, *, color, marker="o", label=None,
     If `marker` is a matplotlib line-style code ("-", "--", ":", "-.") the
     series is drawn as a line with no point markers (points are sorted by x so
     the line reads left-to-right); otherwise it is drawn as markers with no
-    connecting line, exactly as before.  SHOW_YERR / SHOW_XERR gate the
-    vertical / horizontal error bars in both cases.  Markers carry no edge.
+    connecting line.  Markers carry no edge.
+
+    Uncertainty display differs by draw type:
+      * markers - SHOW_YERR / SHOW_XERR gate the vertical / horizontal caps.
+      * lines   - LINE_UNC picks "none" (bare line), "bars" (caps at each
+        underlying point) or "band" (a shaded y +/- yerr envelope), so a fit
+        line is controlled independently of the measured points' error bars.
 
     `key` is the series key (CK / FS / vv0 / ...).  Its GUI-chosen z-order
     (higher = drawn on top) is looked up via zorder_for(); pass None to keep
     the default depth.
     """
-    ye = yerr if SHOW_YERR else None
-    xe = xerr if SHOW_XERR else None
     z = zorder_for(key)
 
     if marker in LINE_STYLES:
         order = np.argsort(x)               # a line must read left-to-right
         x, y = x[order], y[order]
-        ye = ye[order] if ye is not None else None
-        xe = xe[order] if xe is not None else None
+        ye = yerr[order] if yerr is not None else None
+        xe = xerr[order] if xerr is not None else None
+
+        mode = LINE_UNC if LINE_UNC in ("none", "bars", "band") else "none"
+
+        # shaded vertical band (behind the line) when asked for and we have a
+        # vertical sigma to draw; a half-step below the line's z-order so the
+        # line always sits on top of its own envelope.
+        if mode == "band" and ye is not None:
+            ax.fill_between(x, y - ye, y + ye, color=color, alpha=0.20,
+                            linewidth=0, zorder=z - 0.5)
+
+        # error-bar caps along the line only in "bars" mode
+        bar_ye = ye if mode == "bars" else None
+        bar_xe = xe if mode == "bars" else None
         ax.errorbar(
-            x, y, yerr=ye, xerr=xe,
+            x, y, yerr=bar_ye, xerr=bar_xe,
             fmt=marker, color=color,
             linewidth=1.8 * SCALE, capsize=4 * SCALE, elinewidth=1.2 * SCALE,
-            zorder=z, label=label,
+            capthick=1.2 * SCALE, zorder=z, label=label,
         )
         return
 
-    ax.errorbar(
+    ye = yerr if SHOW_YERR else None
+    xe = xerr if SHOW_XERR else None
+    _, caplines, _ = ax.errorbar(
         x, y, yerr=ye, xerr=xe,
         fmt=marker, color=color,
         markersize=6 * SCALE, capsize=4 * SCALE, elinewidth=1.2 * SCALE,
         markeredgewidth=0, zorder=z, label=label,
     )
+    # markeredgewidth=0 (which keeps the point markers edgeless) ALSO zeroes
+    # the cap thickness - matplotlib drives both from the same property - so
+    # the caps render as invisible hairlines and each bar looks like a bare
+    # "|".  Give the caps their own thickness back so they show the flat
+    # top/bottom parts (the usual "T"-shaped error bar).
+    for cap in caplines:
+        cap.set_markeredgewidth(1.2 * SCALE)
 
 
 def add_break_marks(ax_top, ax_bot, d=0.015, lw=1.0):

@@ -83,9 +83,10 @@ def main(path=None, show=False):
                     color=vc.COL[k], marker=vc.MARK[k],
                     label=vc.LABEL[k], key=k)
 
-    ax.set_ylabel(vc.ylabel_for(key, ylab), fontsize=12 * s)
-    ax.set_xlabel("Pressure (GPa)", fontsize=12 * s)
-    ax.tick_params(axis="both", labelsize=10 * s)
+    ax.set_ylabel(vc.ylabel_for(key, ylab),
+                  fontsize=12 * s * vc.AXIS_FONT_SCALE)
+    ax.set_xlabel("Pressure (GPa)", fontsize=12 * s * vc.AXIS_FONT_SCALE)
+    ax.tick_params(axis="both", labelsize=10 * s * vc.AXIS_FONT_SCALE)
     ax.tick_params(axis="both", which="both", direction="in",
                    top=True, right=True)
     ax.yaxis.set_major_locator(MaxNLocator(nbins=6))
