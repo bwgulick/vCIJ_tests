@@ -44,6 +44,25 @@ def load_font(size):
         return ImageFont.load_default()
 
 
+# Pillow's convert() clips these high-bit-depth modes at 255 instead of
+# rescaling, so a 16-bit frame collapses into black-and-white speckle.
+HIGH_DEPTH_MODES = {"I", "I;16", "I;16B", "I;16L", "I;16N", "F"}
+
+
+def load_image(path):
+    """Open an image, rescaling high-bit-depth samples into the 0-255 range."""
+    image = Image.open(path)
+    if image.mode not in HIGH_DEPTH_MODES:
+        return image
+    arr = np.asarray(image, dtype=np.float64)
+    if image.mode.startswith("I;16"):
+        full = 65535.0  # nominal full scale for 16-bit samples
+    else:
+        peak = float(arr.max())  # 32-bit int/float carry no nominal scale
+        full = peak if peak > 0 else 1.0
+    return Image.fromarray(np.clip(arr / full * 255.0, 0, 255).astype(np.uint8), "L")
+
+
 def darkness_centroid_shift(image, threshold_pct):
     """Return (dx, dy) that moves the dark region's centroid to the frame center.
 
@@ -73,7 +92,7 @@ def median_fill(image, mode):
 
 def build_frame(path, font, opts):
     mode = "L" if opts["grayscale"] else "RGB"
-    image = Image.open(path).convert(mode)
+    image = load_image(path).convert(mode)
 
     if opts.get("stabilize"):
         dx, dy = darkness_centroid_shift(image, opts["dark_threshold"])
@@ -110,13 +129,19 @@ def natural_key(name):
     return [int(c) if c.isdigit() else c.lower() for c in re.split(r"(\d+)", name)]
 
 
+# GIF stores frame delays in hundredths of a second, so 10 ms is the shortest
+# delay the format can express. Shorter ones write as 0, which most viewers
+# silently replace with their own ~100 ms default.
+GIF_MIN_MS = 10
+
+
 def frame_durations(count, opts):
     """Per-frame durations: the default everywhere, longer for the trailing frames."""
     durations = [opts["duration"]] * count
     if opts.get("slow_tail") and opts["slow_tail_count"] > 0:
         for i in range(max(0, count - opts["slow_tail_count"]), count):
             durations[i] = opts["slow_tail_ms"]
-    return durations
+    return [max(GIF_MIN_MS, int(round(d))) for d in durations]
 
 
 # ---------------------------------------------------------------------------
@@ -463,10 +488,10 @@ class GifMakerApp:
     # -- creating ------------------------------------------------------------
     def _gather_opts(self):
         opts = {
-            "duration": int(float(self.duration_var.get())),
+            "duration": float(self.duration_var.get()),
             "slow_tail": self.slow_tail_var.get(),
             "slow_tail_count": int(float(self.tail_count_var.get())),
-            "slow_tail_ms": int(float(self.tail_ms_var.get())),
+            "slow_tail_ms": float(self.tail_ms_var.get()),
             "loop": int(float(self.loop_var.get())),
             "scale": float(self.scale_var.get()),
             "grayscale": self.grayscale_var.get(),
@@ -489,6 +514,8 @@ class GifMakerApp:
                 raise ValueError("Milliseconds for the trailing frames must be greater than 0.")
         if opts["scale"] <= 0:
             raise ValueError("Scale must be greater than 0.")
+        opts["clamped"] = (opts["duration"] < GIF_MIN_MS
+                           or (opts["slow_tail"] and opts["slow_tail_ms"] < GIF_MIN_MS))
         if opts["stabilize"] and not 0 < opts["dark_threshold"] < 100:
             raise ValueError("Dark threshold must be between 0 and 100.")
         if not opts["output"]:
@@ -530,7 +557,7 @@ class GifMakerApp:
             frames[0].save(
                 opts["output"], save_all=True, append_images=frames[1:],
                 duration=durations, loop=opts["loop"], optimize=True)
-            self.queue.put(("done", (opts["output"], len(frames), durations)))
+            self.queue.put(("done", (opts["output"], len(frames), durations, opts["clamped"])))
         except Exception as exc:  # surface any PIL/IO error to the UI
             self.queue.put(("error", str(exc)))
 
@@ -542,10 +569,11 @@ class GifMakerApp:
                     self.progress.config(value=payload)
                     self.status_var.set(f"Building frame {payload}/{len(self.files)}…")
                 elif kind == "done":
-                    path, n, durations = payload
+                    path, n, durations, clamped = payload
                     total = sum(durations) / 1000
+                    note = f"  [delay raised to the {GIF_MIN_MS} ms GIF minimum]" if clamped else ""
                     self.progress.config(value=self.progress["maximum"])
-                    self.status_var.set(f"Wrote {n} frames to {path}  ({total:.1f}s total)")
+                    self.status_var.set(f"Wrote {n} frames to {path}  ({total:.1f}s total){note}")
                     self.create_btn.config(state="normal")
                     self.start_preview(path, durations)
                     return
@@ -591,7 +619,7 @@ class GifMakerApp:
             font = load_font(opts["font_size"])
             frame = build_frame(path, font, opts).convert("RGB")
         except Exception:
-            frame = Image.open(path).convert("RGB")
+            frame = load_image(path).convert("RGB")
         scale = min(max_dim / frame.width, max_dim / frame.height, 1.0)
         if scale < 1.0:
             frame = frame.resize((max(1, round(frame.width * scale)),
