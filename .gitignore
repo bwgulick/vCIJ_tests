@@ -1,0 +1,6 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Excel lock files (created while a workbook is open)
+~$*

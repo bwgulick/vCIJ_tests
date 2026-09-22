@@ -5,12 +5,19 @@ Single plot: length (um) vs pressure (PSI), points colored by temperature.
   color = column 4 "Temp calib" (C), rounded to nearest 25 C, blue(cold)->red(hot)
 Points are in the acquisition order of the sheet (top to bottom).
 """
+import os
+
 import openpyxl
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
 
-XLSX, SHEET = "v_hpcat.xlsx", "July (2)"
+_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     os.pardir))
+FIGDIR = os.path.join(_REPO, "figures")
+os.makedirs(FIGDIR, exist_ok=True)
+
+XLSX, SHEET = os.path.join(_REPO, "data", "v_hpcat.xlsx"), "July (2)"
 C_PSI, C_T, C_LEN = 1, 3, 10          # 0-based: col2, col4, "Distance length"
 
 wb = openpyxl.load_workbook(XLSX, data_only=True)
@@ -48,6 +55,6 @@ cb = fig.colorbar(sc, ax=ax, pad=0.02, ticks=np.arange(lo, hi + 1, 50))
 cb.set_label("Temperature (°C, rounded to 25°)", fontsize=11)
 
 fig.tight_layout()
-out = "v_hpcat_single.png"
+out = os.path.join(FIGDIR, "v_hpcat_single.png")
 fig.savefig(out, dpi=200, bbox_inches="tight")
 print(f"{len(P)} points ->", out)

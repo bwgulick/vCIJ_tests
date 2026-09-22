@@ -38,7 +38,9 @@ from matplotlib.widgets import RectangleSelector
 
 from scipy.signal import butter, filtfilt
 
-DEFAULT_CSV = "K1246-600bar.csv"
+_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     os.pardir))
+DEFAULT_CSV = os.path.join(_REPO, "data", "K1246-600bar.csv")
 
 # ----- default step / filter parameters -------------------------------------
 FINE_STEP = 0.0002   # us  (one sample interval)

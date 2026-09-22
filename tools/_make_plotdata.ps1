@@ -1,5 +1,5 @@
 param(
-  [string]$Wb  = "C:\Users\bgulick\Downloads\vCIJ_tests\Cij analysis\Vanadium_Cij_Brian_Claude.xlsx",
+  [string]$Wb  = "$PSScriptRoot\..\workbooks\V_Cij.xlsx",
   [string]$Src = "No Vp 100",
   [string]$Out = "Plot Data",
   [int]$R0 = 2,

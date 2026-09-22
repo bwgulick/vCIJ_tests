@@ -1,9 +1,10 @@
 $ErrorActionPreference = 'Stop'
-$path = 'C:\Users\bgulick\Downloads\vCIJ_tests\Vanadium_Cij_finite_strain_all_equations_GlobalMin - Copy.xlsx'
+$path = "$PSScriptRoot\..\workbooks\Vanadium_Cij_finite_strain_all_equations_GlobalMin - Copy.xlsx"
 
-# --- backup ---
+# --- backup (timestamped, into archive\workbooks so it does not clutter workbooks\) ---
 $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
-$bak = $path -replace '\.xlsx$', "_prekatahara_$stamp.xlsx"
+$bakDir = "$PSScriptRoot\..\archive\workbooks"
+$bak = Join-Path $bakDir ((Split-Path $path -Leaf) -replace '\.xlsx$', "_prekatahara_$stamp.xlsx")
 Copy-Item -LiteralPath $path -Destination $bak -Force
 Write-Host "Backup: $bak"
 

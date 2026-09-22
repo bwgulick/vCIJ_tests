@@ -7,12 +7,19 @@ Two fixes so the small length changes at the holds are visible:
      acquisition order (heat-up -> peak -> cool-down) so overlapping dots separate.
      Pressure is CONSTANT within a hold; the horizontal spread is cosmetic only.
 """
+import os
+
 import openpyxl
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, BoundaryNorm
 
-XLSX, SHEET = "v_hpcat.xlsx", "July (2)"
+_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     os.pardir))
+FIGDIR = os.path.join(_REPO, "figures")
+os.makedirs(FIGDIR, exist_ok=True)
+
+XLSX, SHEET = os.path.join(_REPO, "data", "v_hpcat.xlsx"), "July (2)"
 C_PSI, C_T, C_LEN = 1, 3, 10
 
 wb = openpyxl.load_workbook(XLSX, data_only=True)
@@ -96,6 +103,6 @@ sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm); sm.set_array([])
 cb = fig.colorbar(sm, ax=(axhi, axlo), pad=0.02, ticks=np.arange(lo, hi + 1, 50))
 cb.set_label("Temperature (°C, rounded to 25°)", fontsize=11)
 
-out = "v_hpcat_zoom.png"
+out = os.path.join(FIGDIR, "v_hpcat_zoom.png")
 fig.savefig(out, dpi=200, bbox_inches="tight")
 print(f"{len(P)} points ->", out)

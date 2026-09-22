@@ -10,12 +10,19 @@ Two panels:
      (right axis, gray stairs) so the temperature cycling within each pressure hold is
      unambiguous.
 """
+import os
+
 import openpyxl
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection
 
-XLSX = "v_hpcat.xlsx"
+_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     os.pardir))
+FIGDIR = os.path.join(_REPO, "figures")
+os.makedirs(FIGDIR, exist_ok=True)
+
+XLSX = os.path.join(_REPO, "data", "v_hpcat.xlsx")
 SHEET = "July (2)"
 
 # column indices (0-based) in the sheet
@@ -160,6 +167,6 @@ for pval, block in HOLDS:
 axC.set_title("Unrolled view: length & pressure vs time\n(color = temperature; shaded = heat cycles)")
 
 fig.tight_layout()
-out = "v_hpcat_length_vs_pressure.png"
+out = os.path.join(FIGDIR, "v_hpcat_length_vs_pressure.png")
 fig.savefig(out, dpi=200, bbox_inches="tight")
 print("wrote", out)

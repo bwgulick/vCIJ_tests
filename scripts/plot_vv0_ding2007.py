@@ -9,9 +9,16 @@ The BM3 pressure as a function of compression x = V/V0 is
 
 We invert P(x) numerically at each target pressure to get V/V0(P), then plot.
 """
+import os
+
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy.optimize import brentq
+
+_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     os.pardir))
+FIGDIR = os.path.join(_REPO, "figures")
+os.makedirs(FIGDIR, exist_ok=True)
 
 # --- Ding et al. 2007 vanadium EOS parameters ---
 K0 = 158.0   # GPa   isothermal bulk modulus at P = 0
@@ -49,7 +56,7 @@ def main(pmax=150.0, show=False):
     ax.margins(y=0.04)
     ax.legend(fontsize=10, frameon=False)
 
-    out = "vv0_ding2007.png"
+    out = os.path.join(FIGDIR, "vv0_ding2007.png")
     fig.savefig(out, dpi=300, bbox_inches="tight")
     print(f"saved -> {out}")
 

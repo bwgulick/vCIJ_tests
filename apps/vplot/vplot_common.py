@@ -602,5 +602,9 @@ def exterminate_ticks(axes):
 
 
 def output_path(name):
-    """Absolute path next to this module for a saved figure."""
-    return os.path.join(os.path.dirname(os.path.abspath(__file__)), name)
+    """Absolute path in the repo-level figures/ folder for a saved figure."""
+    here = os.path.dirname(os.path.abspath(__file__))     # apps/vplot
+    figs = os.path.join(here, os.pardir, os.pardir, "figures")
+    figs = os.path.abspath(figs)
+    os.makedirs(figs, exist_ok=True)
+    return os.path.join(figs, name)

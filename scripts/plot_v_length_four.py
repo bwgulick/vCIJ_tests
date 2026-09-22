@@ -15,12 +15,19 @@ Four vanadium length figures from v_hpcat.xlsx, sheet "July (2)".
 
 Run:  py plot_v_length_four.py
 """
+import os
+
 import openpyxl
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, Normalize
 
-XLSX, SHEET = "v_hpcat.xlsx", "July (2)"
+_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     os.pardir))
+FIGDIR = os.path.join(_REPO, "figures")
+os.makedirs(FIGDIR, exist_ok=True)
+
+XLSX, SHEET = os.path.join(_REPO, "data", "v_hpcat.xlsx"), "July (2)"
 C_PSI, C_T, C_LEN = 1, 3, 10          # 0-based: Pressure(PSI), Temp calib(C), Distance length(um)
 
 SPLIT = 525.0                          # y-break: coarse (>SPLIT) over fine (<SPLIT)
@@ -94,7 +101,7 @@ def figure_experiment():
     cbar = fig.colorbar(sc, ax=(ax_hi, ax_lo), pad=0.02)
     cbar.set_label("Pressure (PSI)", fontsize=11)
 
-    out = "v_length_experiment.png"
+    out = os.path.join(FIGDIR, "v_length_experiment.png")
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"{len(P)} points ->", out)
@@ -136,7 +143,7 @@ def figure_cycle(hold_psi, ramp):
     cbar.set_label("Temperature (°C)  (light = cool → dark = hot)", fontsize=10)
 
     fig.tight_layout()
-    out = f"v_length_cycle_{int(hold_psi)}.png"
+    out = os.path.join(FIGDIR, f"v_length_cycle_{int(hold_psi)}.png")
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"{idx.size} points ->", out)

@@ -20,6 +20,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 XLSX = os.environ.get("VPLOT_XLSX", r"C:\Users\bgulick\Downloads\VCIJplotdata.xlsx")
+
+_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     os.pardir))
+FIGDIR = os.path.join(_REPO, "figures")
+os.makedirs(FIGDIR, exist_ok=True)
 SHEET = "HPCAT"
 
 # element identity colors (colorblind-safe; consistent with the repo's other plots)
@@ -63,7 +68,7 @@ def figure_travel_time(name, d):
         ax.margins(0.06)
     ax_s.set_title(f"{name} — two-way travel time vs pressure", fontsize=13)
 
-    out = f"hpcat_tt_{name.lower()}.png"
+    out = os.path.join(FIGDIR, f"hpcat_tt_{name.lower()}.png")
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"{len(d['P'])} points ->", out)
@@ -79,7 +84,7 @@ def figure_length(name, d):
     ax.margins(0.06)
 
     fig.tight_layout()
-    out = f"hpcat_length_{name.lower()}.png"
+    out = os.path.join(FIGDIR, f"hpcat_length_{name.lower()}.png")
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"{len(d['P'])} points ->", out)

@@ -1,6 +1,6 @@
 param(
-  [string]$Wb  = "C:\Users\bgulick\Downloads\vCIJ_tests\Cij analysis\V_Cij.xlsx",
-  [string]$Log = "C:\Users\bgulick\Downloads\vCIJ_tests\_solveraid_log.txt"
+  [string]$Wb  = "$PSScriptRoot\..\workbooks\V_Cij.xlsx",
+  [string]$Log = "$PSScriptRoot\_solveraid_log.txt"
 )
 $ErrorActionPreference = "Stop"
 

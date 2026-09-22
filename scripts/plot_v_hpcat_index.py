@@ -7,12 +7,19 @@ excursion is visible as a light-dark-light sweep along the dashed connector.
 Temperature is also printed at each point for exact values.
 """
 import colorsys
+import os
+
 import openpyxl
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.colors import LinearSegmentedColormap, Normalize, to_rgba
 
-XLSX, SHEET = "v_hpcat.xlsx", "July (2)"
+_REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                     os.pardir))
+FIGDIR = os.path.join(_REPO, "figures")
+os.makedirs(FIGDIR, exist_ok=True)
+
+XLSX, SHEET = os.path.join(_REPO, "data", "v_hpcat.xlsx"), "July (2)"
 C_PSI, C_T, C_LEN = 1, 3, 10          # 0-based: Pressure(PSI), Temp calib(C), Distance length(um)
 START = 7                              # first row of the final 7000 PSI ramp + heat cycling
 
@@ -95,6 +102,6 @@ fig.text(0.5, -0.01,
          ha="center", fontsize=8, color="0.35")
 
 fig.tight_layout()
-out = "v_hpcat_index.png"
+out = os.path.join(FIGDIR, "v_hpcat_index.png")
 fig.savefig(out, dpi=200, bbox_inches="tight")
 print(f"{len(P)} points ->", out)

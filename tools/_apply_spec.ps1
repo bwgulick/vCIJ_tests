@@ -1,6 +1,6 @@
 param(
-  [string]$Wb   = "C:\Users\bgulick\Downloads\vCIJ_tests\Cij analysis\Vanadium_Cij_Brian_Claude.xlsx",
-  [string]$Spec = "C:\Users\bgulick\Downloads\vCIJ_tests\_uncert_step1_spec.tsv"
+  [string]$Wb   = "$PSScriptRoot\..\workbooks\V_Cij.xlsx",
+  [string]$Spec = "$PSScriptRoot\_uncert_step1_spec.tsv"
 )
 $ErrorActionPreference = "Stop"
 $xl = New-Object -ComObject Excel.Application

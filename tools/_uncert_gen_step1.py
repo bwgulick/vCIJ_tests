@@ -1,11 +1,16 @@
 # Generates a TSV spec of per-point uncertainty formulas (Step 1) for the 4 combo sheets.
 # Output columns: sheet<TAB>cell<TAB>kind(F/T)<TAB>content
+import os
+
 import openpyxl
 from openpyxl.utils import get_column_letter as CL
 
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_REPO = os.path.abspath(os.path.join(_HERE, os.pardir))
+
 R0, R1 = 2, 23                      # data rows
 START = 150                         # first new column (ET)
-path = r"Cij analysis/Vanadium_Cij_Brian_Claude.xlsx"
+path = os.path.join(_REPO, "workbooks", "V_Cij.xlsx")
 
 # Per-sheet config: Cij experimental cells, and 3 measurement channels (m_cell, time_cell)
 # with coefficient vectors a[C11],a[C44],a[C12] over the 3 channels.
@@ -117,6 +122,6 @@ for sheet, cfg in sheets.items():
         else:
             emit(sheet, f"AB{r}", "F", f"=SQRT((Q{r}/M{r})^2+(0.0002/{tt}{r})^2)*{vv}{r}")
 
-with open("_uncert_step1_spec.tsv","w",encoding="utf-8") as f:
+with open(os.path.join(_HERE, "_uncert_step1_spec.tsv"),"w",encoding="utf-8") as f:
     f.write("\n".join(rows))
 print(f"wrote {len(rows)} cell ops for step1; new cols {COL['relA2']}..{COL['sigGH']}")

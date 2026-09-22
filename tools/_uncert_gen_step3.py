@@ -11,6 +11,10 @@
 #   params: CK SE = GT44..49, FS SE = GT70..75 (idx 0..5 = C11,C12,C44,C11',C12',C44')
 #   moduli sigma: CK = GS54..57, FS = GS80..83 (K0,GV0,GR0,GH0)
 
+import os
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+
 rows = []
 def emit(sheet, cell, formula): rows.append(f"{sheet}\t{cell}\tF\t{formula}")
 
@@ -114,6 +118,6 @@ emit("Super Summary", "X15",
      "NOTE: Reg = mean of 8 per-pressure combo fits (4 FS+4 CK); Global = mean of 8 global fits. "
      "+/- combines fit SE and between-combo scatter. See Summary!U3 and 'GLOBAL Summary'!S2.")
 
-with open("_uncert_step3_spec.tsv","w",encoding="utf-8") as f:
+with open(os.path.join(_HERE, "_uncert_step3_spec.tsv"),"w",encoding="utf-8") as f:
     f.write("\n".join(rows))
 print(f"wrote {len(rows)} cell ops for step3")
