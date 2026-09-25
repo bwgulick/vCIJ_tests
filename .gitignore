@@ -4,3 +4,12 @@ __pycache__/
 
 # Excel lock files (created while a workbook is open)
 ~$*
+
+# Figures are not published to the repo (kept local only)
+figures/
+
+# Papers and manuscripts are not published to the repo:
+#   - third-party journal PDFs are copyrighted
+#   - VCIJ_v2 is the unpublished manuscript draft
+docs/*.pdf
+docs/*.txt
