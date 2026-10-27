@@ -10,7 +10,13 @@ _REPO = os.path.abspath(os.path.join(_HERE, os.pardir))
 
 R0, R1 = 2, 23                      # data rows
 START = 150                         # first new column (ET)
-path = os.path.join(_REPO, "workbooks", "V_Cij.xlsx")
+# Must resolve to the SAME workbook _apply_spec.ps1 writes to, or the generated
+# spec describes a different file than the one it gets applied to.  Same rule as
+# the .ps1 tools: $VCIJ_WB, else the live working copy in ~\Downloads.
+path = os.environ.get(
+    "VCIJ_WB",
+    os.path.join(os.path.expanduser("~"), "Downloads", "V_Cij_current_Oct.xlsx"),
+)
 
 # Per-sheet config: Cij experimental cells, and 3 measurement channels (m_cell, time_cell)
 # with coefficient vectors a[C11],a[C44],a[C12] over the 3 channels.

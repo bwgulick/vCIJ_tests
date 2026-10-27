@@ -1,5 +1,9 @@
 param(
-  [string]$Wb  = "$PSScriptRoot\..\workbooks\V_Cij.xlsx",
+  # Live fitting workbook.  Defaults to the VCIJ_WB env var, else the working
+  # copy in ~\Downloads.  The repo's workbooks\V_Cij.xlsx is a deliberate
+  # checkpoint and may lag behind -- pass -Wb to target it explicitly.
+  [string]$Wb  = $(if ($env:VCIJ_WB) { $env:VCIJ_WB }
+            else { Join-Path $HOME "Downloads\V_Cij_current_Oct.xlsx" }),
   [string]$Log = "$PSScriptRoot\_solveraid_log.txt"
 )
 $ErrorActionPreference = "Stop"

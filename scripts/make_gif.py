@@ -13,8 +13,15 @@ from PIL import Image, ImageColor, ImageDraw, ImageFont
 # ----------------------------------------------------------------------------
 # CONFIG
 # ----------------------------------------------------------------------------
-SOURCE_DIR = r"c:\Users\bgulick\Desktop\16BMB_March_2026\e290730-Gulick\US\Ni1\Strainimg"
-OUTPUT_PATH = os.path.join(SOURCE_DIR, "Nickel.gif")
+# Folder of numbered .tif frames.  Set the VGIF_SRC env var, or edit the
+# fallback below.  The default is a beamtime image folder that is NOT present
+# on every machine -- check that it exists before running.
+SOURCE_DIR = os.environ.get(
+    "VGIF_SRC",
+    os.path.join(os.path.expanduser("~"), "Desktop", "16BMB_March_2026",
+                 "e290730-Gulick", "US", "Ni1", "Strainimg"),
+)
+OUTPUT_PATH = os.environ.get("VGIF_OUT", os.path.join(SOURCE_DIR, "Nickel.gif"))
 
 FRAME_DURATION_MS = 500  # default duration per frame, in milliseconds
 LOOP = 0  # 0 = loop forever

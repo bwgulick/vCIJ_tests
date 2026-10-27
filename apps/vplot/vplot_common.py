@@ -25,9 +25,16 @@ import pandas as pd
 
 # ----------------------------------------------------------------------
 # Data location.  Override with the VPLOT_XLSX env var if the file moves.
+#
+# VCIJplotdata.xlsx is the *final* plot-data workbook: the paper figures are
+# drawn only from here.  Day-to-day fitting happens in V_Cij_current_Oct.xlsx
+# (see tools/), and results are pasted across once they are settled.  It lives
+# outside the repo, so the default is relative to the home directory rather
+# than hardcoding a user name.
 # ----------------------------------------------------------------------
 DEFAULT_XLSX = os.environ.get(
-    "VPLOT_XLSX", r"C:\Users\bgulick\Desktop\V_single_figures\VCIJplotdata.xlsx"
+    "VPLOT_XLSX",
+    os.path.join(os.path.expanduser("~"), "Downloads", "VCIJplotdata.xlsx"),
 )
 ALL_SHEET = "All"
 
@@ -41,17 +48,18 @@ ALL_SHEET = "All"
 # from PALETTES below or from any custom hex / matplotlib colour name.
 # ----------------------------------------------------------------------
 COL = {
-    "CK":   "#0072B2",   # blue   - Cook's method
-    "FS":   "#E69F00",   # orange - finite strain
+    "CK":   "#0072B2",   # blue   - this work (Cook's-method lengths)
+    "FS":   "#E69F00",   # orange - 3rd-order finite-strain fit to CK
+    "4O":   "#D55E00",   # vermillion - 4th-order finite-strain fit (C44 only)
     "poly": "#009E73",   # green  - polycrystalline aggregate (Kpoly / Gpoly)
-    "vv0":  "#0072B2",   # blue   - measured V/V0 compression points (this study)
+    "vv0":  "#0072B2",   # blue   - measured V/V0 compression points (this work)
     "ding": "#000000",   # black  - Ding et al. 2007 BM3 reference curve (a line)
 }
 
 # marker per dataset (shape is a second, redundant cue - helps in greyscale
-# and for viewers who can't separate the hues).  "ding" defaults to a solid
-# line ("-") so the reference EOS is drawn as a curve, not scattered points.
-MARK = {"CK": "o", "FS": "s", "poly": "D", "vv0": "o", "ding": "-"}
+# and for viewers who can't separate the hues).  The fits (FS, 4O) and "ding"
+# default to lines so they are drawn as curves, not scattered points.
+MARK = {"CK": "o", "FS": "-", "4O": "--", "poly": "D", "vv0": "o", "ding": "-"}
 
 # ----------------------------------------------------------------------
 # Editable legend names per dataset.  These are the "base" tags the GUI lets
@@ -60,8 +68,8 @@ MARK = {"CK": "o", "FS": "s", "poly": "D", "vv0": "o", "ding": "-"}
 # tri-plot uses them verbatim.  The GUI writes chosen names into LABEL
 # before each render, so renaming a series updates every legend.
 # ----------------------------------------------------------------------
-LABEL = {"CK": "Cook", "FS": "Finite strain", "poly": "Gulick et al. 2025",
-         "vv0": "This study", "ding": "Ding et al. 2007"}
+LABEL = {"CK": "This work", "FS": "3rd-order FS fit", "4O": "4th-order FS fit",
+         "poly": "Gulick et al. 2025", "vv0": "This work", "ding": "Ding et al. 2007"}
 
 # ----------------------------------------------------------------------
 # Literature / comparison series - AUTO-DISCOVERED from the workbook.
@@ -254,6 +262,7 @@ YLABEL = {}
 # ----------------------------------------------------------------------
 LEGEND_XY = None
 LEGEND_NCOL = None
+LEGEND_SHOW = True
 
 # ----------------------------------------------------------------------
 # Font-size multipliers, set live by the GUI.  Each scales the plot modules'
@@ -279,6 +288,8 @@ def place_legend(ax, handles, labels, fontsize, *,
 
     Returns the Legend so the GUI can read back a dragged position.
     """
+    if not LEGEND_SHOW:
+        return None
     fontsize = fontsize * LEGEND_FONT_SCALE   # GUI legend font-size multiplier
     ncol = max(1, int(LEGEND_NCOL if LEGEND_NCOL else default_ncol))
     if LEGEND_XY is not None:

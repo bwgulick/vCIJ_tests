@@ -13,3 +13,6 @@ figures/
 #   - VCIJ_v2 is the unpublished manuscript draft
 docs/*.pdf
 docs/*.txt
+
+# vplot GUI remembers the last-browsed workbook here (machine-local path)
+apps/vplot/vplot_state.json

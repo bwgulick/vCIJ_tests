@@ -26,6 +26,22 @@ import vplot_common as vc
 # Ding et al. (2007) vanadium BM3 EOS parameters (edit here to refit the curve).
 K0_DING = 158.0   # GPa   bulk modulus at P = 0
 KP_DING = 3.9     #        pressure derivative K'
+K0_GULICK = 151.0 #Gulick 2025 V polyxtl
+KP_GULICK = 3.47 #Gulick 2025 V polyxtl K'
+K0_CRICHTON = 152.95
+KP_CHRICHTON = 5.5
+K0_MINGMANG = 154
+KP_MINGMANG = 4.27
+K0_NAK = 152.1
+KP_NAK = 4.1
+K0_ERRAND = 152
+KP_ERRAND = 5.4
+K0_STEV = 158.9
+KP_STEV = 3.58
+K0_DINGNH = 195
+KP_DINGNH = 3.5
+K0_JENEI = 179
+KP_JENEI = 3.11
 
 # Panel registry so the GUI's bounds/label panel shows a V/V0 row.
 PANELS = [("V/V0", "$V/V_0$")]
@@ -55,18 +71,33 @@ def main(path=None, show=False):
 
     # --- measured V/V0 points (this study) ---
     P, vv0, sig, sigP = vc.load_vv0(path)
-    if vc.visible("vv0") and P.size:
-        vc.draw_pts(ax, P, vv0, yerr=sig, xerr=sigP,
-                    color=vc.COL["vv0"], marker=vc.MARK["vv0"],
-                    label=vc.LABEL["vv0"], key="vv0")
 
     # --- Ding et al. 2007 BM3 reference curve, over the data's pressure span ---
     if vc.visible("ding"):
         pmax = float(np.nanmax(P)) if P.size else 150.0
         cx, cy = _ding_curve(pmax if pmax > 0 else 150.0)
         lab = f"{vc.LABEL['ding']} ($K_0$={K0_DING:.0f}, $K'$={KP_DING:.1f})"
-        vc.draw_pts(ax, cx, cy, color=vc.COL["ding"],
-                    marker=vc.MARK["ding"], label=lab, key="ding")
+        ax.plot(cx, cy, color=vc.COL["ding"], linestyle="--", linewidth=1, label=lab)
+
+    # --- other literature BM3 reference curves ---
+    _others = [
+        ("Gulick et al. 2025", K0_GULICK, KP_GULICK, "green"),
+        ("Ming & Manghnani", K0_MINGMANG, KP_MINGMANG, "red"),
+        ("Errandonea", K0_ERRAND, KP_ERRAND, "pink"),
+        ("Ding et al. 2007 (NH)", K0_DINGNH, KP_DINGNH, "orange"),
+        ("Jenei", K0_JENEI, KP_JENEI, "purple"),
+    ]
+    pmax = float(np.nanmax(P)) if P.size else 150.0
+    pmax = pmax if pmax > 0 else 150.0
+    for name, k0, kp, color in _others:
+        cx, cy = _ding_curve(pmax, k0=k0, kp=kp)
+        lab = f"{name} ($K_0$={k0:.0f}, $K'$={kp:.2f})"
+        ax.plot(cx, cy, color=color, linestyle="--", linewidth=1, label=lab)
+
+    # --- measured V/V0 points (this study), drawn on top ---
+    if vc.visible("vv0") and P.size:
+        ax.plot(P, vv0, color=vc.COL["vv0"], marker="o", linestyle="none",
+                markersize=4, label=vc.LABEL["vv0"], zorder=10)
 
     ax.set_ylabel(vc.ylabel_for("V/V0", "$V/V_0$"),
                   fontsize=12 * s * vc.AXIS_FONT_SCALE)
@@ -79,6 +110,12 @@ def main(path=None, show=False):
 
     vc.apply_ylim(ax, "V/V0")
     vc.apply_xlim(ax)
+
+    # always show a tick at V/V0 = 1.00 (no compression)
+    yticks = [float(t) for t in ax.get_yticks()]
+    if 1.0 not in yticks:
+        yticks.append(1.0)
+    ax.set_yticks(sorted(yticks))
 
     handles, labels = ax.get_legend_handles_labels()
     if handles:

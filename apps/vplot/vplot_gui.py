@@ -17,6 +17,7 @@ before each render, so the plot modules pick them up with no other changes.
 Run:  python vplot_gui.py     (Python 3.11 - has pandas/matplotlib)
 """
 import os
+import json
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox, colorchooser
 
@@ -44,8 +45,8 @@ FIGURES = {
 # sources (Katahara, Antonangeli, ...) are auto-discovered from the workbook
 # and appended at runtime by _series_list(), so no source is hard-coded here.
 CORE_SERIES = [
-    ("CK",   "CK (Cook)"),
-    ("FS",   "FS (finite strain)"),
+    ("CK",   "CK (this work)"),
+    ("FS",   "FS (3rd-order fit)"),
     ("poly", "poly (Kpoly / Gpoly)"),
     ("vv0",  "V/V0 data (this study)"),
     ("ding", "Ding 2007 (BM3 curve)"),
@@ -80,6 +81,12 @@ LINE_UNC = {
 }
 LINE_UNC_BY_CODE = {v: k for k, v in LINE_UNC.items()}
 
+# Persistent "remember the last data file" state, stored next to this script so
+# the browse selection survives between launches.
+_STATE_FILE = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)), "vplot_state.json"
+)
+
 
 class VPlotApp(tk.Tk):
     def __init__(self):
@@ -96,10 +103,14 @@ class VPlotApp(tk.Tk):
         # blocking the next launch.
         self.protocol("WM_DELETE_WINDOW", self._force_quit)
 
-        # Discover comparison sources from the default workbook up front, so
+        # Remembered data file: the last place the user browsed to, else the
+        # default workbook.  Persisted so the selection survives between launches.
+        self.xlsx_path = self._load_state() or vc.DEFAULT_XLSX
+
+        # Discover comparison sources from the remembered workbook up front, so
         # their style rows are present before the first render.  Safe if the
         # file is missing - the rows just appear after the first successful plot.
-        self._discover(vc.DEFAULT_XLSX)
+        self._discover(self.xlsx_path)
 
         # live per-series style, seeded from the module defaults (now including
         # any auto-discovered sources)
@@ -117,6 +128,8 @@ class VPlotApp(tk.Tk):
         # Shaded band), independent of the marker error-bar toggles.
         self.line_unc_var = tk.StringVar(
             value=LINE_UNC_BY_CODE.get(vc.LINE_UNC, "Shaded band"))
+        # global legend on/off; honoured by every plot module via place_legend()
+        self.legend_show_var = tk.BooleanVar(value=vc.LEGEND_SHOW)
         # output resolution + figure size (cm); size blank => module default
         self.dpi_var = tk.StringVar(value=str(vc.DPI))
         self.figw_var = tk.StringVar(value="")
@@ -258,7 +271,7 @@ class VPlotApp(tk.Tk):
         srcbar = ttk.Frame(self, padding=(8, 0, 8, 8))
         srcbar.pack(side=tk.TOP, fill=tk.X)
         ttk.Label(srcbar, text="Data file:").pack(side=tk.LEFT)
-        self.src_var = tk.StringVar(value=vc.DEFAULT_XLSX)
+        self.src_var = tk.StringVar(value=self.xlsx_path)
         ttk.Entry(srcbar, textvariable=self.src_var).pack(
             side=tk.LEFT, fill=tk.X, expand=True, padx=4)
         ttk.Button(srcbar, text="Browse...", command=self._browse).pack(side=tk.LEFT)
@@ -266,6 +279,22 @@ class VPlotApp(tk.Tk):
         self.status = tk.StringVar(value="Ready.")
         ttk.Label(self, textvariable=self.status, relief=tk.SUNKEN,
                   anchor=tk.W).pack(side=tk.BOTTOM, fill=tk.X)
+
+    def _load_state(self):
+        """Return the last data-file path the user browsed to, or None."""
+        try:
+            with open(_STATE_FILE, "r", encoding="utf-8") as fh:
+                return json.load(fh).get("xlsx")
+        except (OSError, ValueError):
+            return None
+
+    def _save_state(self, path):
+        """Persist the data-file path so the next launch opens it by default."""
+        try:
+            with open(_STATE_FILE, "w", encoding="utf-8") as fh:
+                json.dump({"xlsx": path}, fh)
+        except OSError:
+            pass
 
     @staticmethod
     def _discover(path):
@@ -423,26 +452,32 @@ class VPlotApp(tk.Tk):
         box = ttk.Frame(parent, padding=8)
         box.pack(side=tk.TOP, fill=tk.X)
 
-        ttk.Label(box, text="X (0-1):").grid(row=0, column=0, padx=6, pady=2, sticky="w")
+        ttk.Checkbutton(box, text="Show legend",
+                        variable=self.legend_show_var,
+                        command=lambda: self._toggle_legend()).grid(
+                            row=0, column=0, columnspan=6, padx=6, pady=(0, 4),
+                            sticky="w")
+
+        ttk.Label(box, text="X (0-1):").grid(row=1, column=0, padx=6, pady=2, sticky="w")
         xe = ttk.Entry(box, textvariable=self.leg_x_var, width=8)
-        xe.grid(row=0, column=1, padx=6, pady=2, sticky="w")
+        xe.grid(row=1, column=1, padx=6, pady=2, sticky="w")
 
-        ttk.Label(box, text="Y (0-1):").grid(row=0, column=2, padx=6, pady=2, sticky="w")
+        ttk.Label(box, text="Y (0-1):").grid(row=1, column=2, padx=6, pady=2, sticky="w")
         ye = ttk.Entry(box, textvariable=self.leg_y_var, width=8)
-        ye.grid(row=0, column=3, padx=6, pady=2, sticky="w")
+        ye.grid(row=1, column=3, padx=6, pady=2, sticky="w")
 
-        ttk.Label(box, text="Columns:").grid(row=0, column=4, padx=6, pady=2, sticky="w")
+        ttk.Label(box, text="Columns:").grid(row=1, column=4, padx=6, pady=2, sticky="w")
         ncb = ttk.Combobox(box, textvariable=self.leg_ncol_var, width=6,
                            state="readonly",
                            values=["auto", "1", "2", "3", "4", "5", "6"])
-        ncb.grid(row=0, column=5, padx=6, pady=2, sticky="w")
+        ncb.grid(row=1, column=5, padx=6, pady=2, sticky="w")
         ncb.bind("<<ComboboxSelected>>", lambda e: self._auto_render())
 
         ttk.Button(box, text="Reset position (auto)",
                    command=self._reset_legend).grid(
-                       row=1, column=0, columnspan=2, padx=6, pady=(4, 0), sticky="w")
+                       row=2, column=0, columnspan=2, padx=6, pady=(4, 0), sticky="w")
         ttk.Label(box, text="Blank X/Y = auto; or drag the legend on the plot"
-                  ).grid(row=1, column=2, columnspan=4, padx=6, pady=(4, 0), sticky="w")
+                  ).grid(row=2, column=2, columnspan=4, padx=6, pady=(4, 0), sticky="w")
 
         for ent in (xe, ye):
             ent.bind("<Return>",   lambda e: self._auto_render())
@@ -453,6 +488,11 @@ class VPlotApp(tk.Tk):
         self.leg_x_var.set("")
         self.leg_y_var.set("")
         vc.LEGEND_XY = None
+        self._auto_render()
+
+    def _toggle_legend(self):
+        """Mirror the Show legend checkbox into vc.LEGEND_SHOW and re-render."""
+        vc.LEGEND_SHOW = bool(self.legend_show_var.get())
         self._auto_render()
 
     def _collect_legend(self):
@@ -874,6 +914,8 @@ class VPlotApp(tk.Tk):
         )
         if path:
             self.src_var.set(path)
+            self.xlsx_path = path
+            self._save_state(path)
             # surface any comparison sources in the new file right away
             self._discover(path)
             self._sync_style_rows()
@@ -919,6 +961,9 @@ class VPlotApp(tk.Tk):
     def render(self):
         module = FIGURES[self.fig_choice.get()]
         path = self.src_var.get().strip() or None
+        if path:
+            self.xlsx_path = path
+            self._save_state(path)
 
         # push the current style choices into the shared module
         vc.COL.update(self.colors)

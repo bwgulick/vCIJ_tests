@@ -15,14 +15,19 @@ Produces four figures:
 Run:  py plot_hpcat_ni_v.py
 """
 import os
+import sys
+
 import openpyxl
 import numpy as np
 import matplotlib.pyplot as plt
 
-XLSX = os.environ.get("VPLOT_XLSX", r"C:\Users\bgulick\Downloads\VCIJplotdata.xlsx")
-
 _REPO = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                      os.pardir))
+
+# Reuse the vplot workbook location so there is ONE default path -- and one
+# VPLOT_XLSX override -- for VCIJplotdata.xlsx across the whole repo.
+sys.path.insert(0, os.path.join(_REPO, "apps", "vplot"))
+from vplot_common import DEFAULT_XLSX as XLSX  # noqa: E402
 FIGDIR = os.path.join(_REPO, "figures")
 os.makedirs(FIGDIR, exist_ok=True)
 SHEET = "HPCAT"
