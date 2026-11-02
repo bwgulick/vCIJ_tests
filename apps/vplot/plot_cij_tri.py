@@ -71,32 +71,29 @@ def main(path=None, show=False):
                         label=vc.LABEL[k], key=k)
 
         ax.set_ylabel(vc.ylabel_for(key, ylab),
-                      fontsize=12 * s * vc.AXIS_FONT_SCALE)
-        ax.tick_params(axis="both", labelsize=10 * s * vc.AXIS_FONT_SCALE)
+                      fontsize=vc.font_pt("label", 12) * vc.AXIS_FONT_SCALE)
+        ax.tick_params(axis="both", labelsize=vc.font_pt("tick", 10) * vc.AXIS_FONT_SCALE)
         ax.yaxis.set_major_locator(MaxNLocator(nbins=5))
         ax.margins(y=0.15)
         vc.apply_ylim(ax, key)          # GUI-set y bounds (blank => auto)
 
-    axes[-1].set_xlabel("Pressure (GPa)", fontsize=12 * s * vc.AXIS_FONT_SCALE)
+    axes[-1].set_xlabel("Pressure (GPa)", fontsize=vc.font_pt("label", 12) * vc.AXIS_FONT_SCALE)
     vc.apply_xlim(axes[-1])             # shared x bounds (sharex propagates)
 
-    # single combined legend (dedup handles) on the top panel.  Collect across
-    # ALL panels so a literature series that appears only on C12/C44 (not C11)
-    # still gets a legend entry.
-    handles, labels = [], []
-    for ax in axes:
-        for h, l in zip(*ax.get_legend_handles_labels()):
-            if l not in labels:
-                handles.append(h); labels.append(l)
-    vc.place_legend(axes[0], handles, labels, 10 * s)
+    # legend(s) per vc.LEGEND_MODE: by default one combined legend (dedup
+    # handles) on the top panel, collected across ALL panels so a literature
+    # series that appears only on C12/C44 (not C11) still gets an entry; or
+    # the shared series as a banner above the top panel.
+    vc.draw_legends(fig, axes, vc.font_pt("legend", 10))
 
     # break marks between each stacked pair, then exterminate
     vc.add_break_marks(axes[0], axes[1])
     vc.add_break_marks(axes[1], axes[2])
     vc.exterminate_ticks(list(axes))
+    vc.place_panel_label(fig, axes[0], vc.font_pt("panel", 12))   # "(a)" etc. from the GUI
 
     out = vc.output_path("cij_tri.png")
-    fig.savefig(out, dpi=vc.DPI, bbox_inches="tight")
+    vc.save_figure(fig, out)
     print(f"CK/FS points -> {out}")
     if show:
         plt.show()

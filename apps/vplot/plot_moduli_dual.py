@@ -86,12 +86,12 @@ def main(path=None, show=False):
     _draw_panel(ax2, df, g_key, g_ck, g_fs, g_ncrt, g_pcol, g_perr)
 
     ax1.set_ylabel(vc.ylabel_for(k_key, k_ylab),
-                   fontsize=12 * s * vc.AXIS_FONT_SCALE)
+                   fontsize=vc.font_pt("label", 12) * vc.AXIS_FONT_SCALE)
     ax2.set_ylabel(vc.ylabel_for(g_key, g_ylab),
-                   fontsize=12 * s * vc.AXIS_FONT_SCALE)
-    ax2.set_xlabel("Pressure (GPa)", fontsize=12 * s * vc.AXIS_FONT_SCALE)
-    ax1.tick_params(axis="both", labelsize=10 * s * vc.AXIS_FONT_SCALE)
-    ax2.tick_params(axis="both", labelsize=10 * s * vc.AXIS_FONT_SCALE)
+                   fontsize=vc.font_pt("label", 12) * vc.AXIS_FONT_SCALE)
+    ax2.set_xlabel("Pressure (GPa)", fontsize=vc.font_pt("label", 12) * vc.AXIS_FONT_SCALE)
+    ax1.tick_params(axis="both", labelsize=vc.font_pt("tick", 10) * vc.AXIS_FONT_SCALE)
+    ax2.tick_params(axis="both", labelsize=vc.font_pt("tick", 10) * vc.AXIS_FONT_SCALE)
 
     # GUI-set bounds (blank => auto); sharex propagates the x limits
     vc.apply_ylim(ax1, k_key)
@@ -105,7 +105,7 @@ def main(path=None, show=False):
         for h, l in zip(*ax.get_legend_handles_labels()):
             if l not in labels:
                 handles.append(h); labels.append(l)
-    vc.place_legend(ax1, handles, labels, 9 * s,
+    vc.place_legend(ax1, handles, labels, vc.font_pt("legend", 9),
                     default_ncol=3, default_loc="upper left")
 
     # diagonal break marks straddling the interior spine (the y axis jumps
@@ -114,9 +114,10 @@ def main(path=None, show=False):
 
     # clean interior spines/ticks - MUST be called after the break marks
     vc.exterminate_ticks([ax1, ax2])
+    vc.place_panel_label(fig, ax1, vc.font_pt("panel", 12))       # "(a)" etc. from the GUI
 
     out = vc.output_path("moduli_dual.png")
-    fig.savefig(out, dpi=vc.DPI, bbox_inches="tight")
+    vc.save_figure(fig, out)
     print(f"CK/FS/poly points -> {out}")
     if show:
         plt.show()

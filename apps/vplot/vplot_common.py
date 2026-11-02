@@ -22,6 +22,7 @@ import os
 import re
 import numpy as np
 import pandas as pd
+from matplotlib.text import Annotation
 
 # ----------------------------------------------------------------------
 # Data location.  Override with the VPLOT_XLSX env var if the file moves.
@@ -307,6 +308,135 @@ def place_legend(ax, handles, labels, fontsize, *,
 
 
 # ----------------------------------------------------------------------
+# Legend layout, set live by the GUI.  SHARED_KEYS are this work's series
+# (data + both fits), which appear on every panel of the paper figure;
+# everything else is a literature / comparison source.
+#   LEGEND_MODE "panel"  : one combined legend on the top panel (the default).
+#               "banner" : the shared series in ONE horizontal figure-level
+#                          legend above the top panel; literature sources get
+#                          a small legend in each panel they appear on.
+#               "lit"    : no shared series at all, literature legend per
+#                          panel only - for panels whose key is carried by the
+#                          banner on another panel of the same figure.
+# ----------------------------------------------------------------------
+LEGEND_MODE = "panel"
+SHARED_KEYS = ("CK", "FS", "4O")
+
+
+def _dedup(pairs):
+    """Unique (handle, label) pairs by label, in first-seen order."""
+    seen, out = set(), []
+    for h, l in pairs:
+        if l not in seen:
+            seen.add(l)
+            out.append((h, l))
+    return out
+
+
+def place_banner(fig, ax, handles, labels, fontsize):
+    """Horizontal, frameless figure-level legend centred just above `ax`.
+
+    Anchored in `ax`'s coordinates so it follows the top panel when
+    fit_to_size() moves the axes; one column per entry unless LEGEND_NCOL
+    is set.
+    """
+    if not LEGEND_SHOW or not handles:
+        return None
+    ncol = max(1, int(LEGEND_NCOL if LEGEND_NCOL else len(handles)))
+    return fig.legend(handles, labels, fontsize=fontsize * LEGEND_FONT_SCALE,
+                      frameon=False, ncol=ncol, loc="lower center",
+                      bbox_to_anchor=(0.5, 1.0), bbox_transform=ax.transAxes,
+                      borderaxespad=0.3, columnspacing=1.2, handlelength=2.0)
+
+
+def draw_legends(fig, axes, fontsize, *, default_ncol=1, default_loc="best"):
+    """Draw the figure's legend(s) according to LEGEND_MODE.
+
+    `axes` is the top-to-bottom panel list; the combined legend and the
+    banner both sit on axes[0].
+    """
+    axes = list(axes)
+    pairs = [hl for ax in axes for hl in zip(*ax.get_legend_handles_labels())]
+    if LEGEND_MODE not in ("banner", "lit"):
+        uniq = _dedup(pairs)
+        if uniq:
+            place_legend(axes[0], [h for h, _ in uniq], [l for _, l in uniq],
+                         fontsize, default_ncol=default_ncol,
+                         default_loc=default_loc)
+        return
+
+    shared = {LABEL.get(k) for k in SHARED_KEYS}
+    for ax in axes:
+        lit = [(h, l) for h, l in zip(*ax.get_legend_handles_labels())
+               if l not in shared]
+        if lit:
+            place_legend(ax, [h for h, _ in lit], [l for _, l in lit],
+                         fontsize, default_loc=default_loc)
+    if LEGEND_MODE == "banner":
+        uniq = _dedup((h, l) for h, l in pairs if l in shared)
+        place_banner(fig, axes[0], [h for h, _ in uniq], [l for _, l in uniq],
+                     fontsize)
+
+
+# ----------------------------------------------------------------------
+# Panel label ("(a)", "b", ...) for multi-panel paper figures, set live by
+# the GUI.
+#   PANEL_LABEL       : the text to draw; blank => no label.
+#   PANEL_LABEL_POS   : "inside"  => top-left corner inside the top axes,
+#                       "outside" => level with the top axes' top edge, flush
+#                                    with the left edge of its y-axis label.
+#   PANEL_LABEL_XY    : (x, y) in the top axes' fraction for the label's
+#                       upper-left corner, or None => use PANEL_LABEL_POS.  The
+#                       GUI fills this in when you type coordinates OR drag the
+#                       label.  (Axes, not figure, fraction: savefig's
+#                       bbox_inches="tight" remaps figure fraction to the
+#                       cropped box, so the label would jump on export.)
+#   PANEL_LABEL_SCALE : font-size multiplier (1.0 = axis-label size).
+#   PANEL_LABEL_BOLD  : bold weight on/off.
+# The plot scripts draw it through place_panel_label() below.
+# ----------------------------------------------------------------------
+PANEL_LABEL = ""
+PANEL_LABEL_POS = "inside"
+PANEL_LABEL_XY = None
+PANEL_LABEL_SCALE = 1.0
+PANEL_LABEL_BOLD = True
+PANEL_LABEL_GID = "panel_label"   # lets the GUI find the artist for dragging
+
+
+def place_panel_label(fig, ax, fontsize):
+    """Draw the GUI's panel label on `fig`, anchored to the top axes `ax`.
+
+    The label is a FIGURE-level artist (positioned in `ax`'s coordinates), so
+    it draws above every panel and can be dragged onto any of them; a child
+    of `ax` would be hidden under the panels drawn after it.
+
+    Returns the (draggable) Annotation, or None when the label is blank.
+    """
+    text = PANEL_LABEL.strip()
+    if not text:
+        return None
+    kw = dict(fontsize=fontsize * PANEL_LABEL_SCALE,
+              fontweight="bold" if PANEL_LABEL_BOLD else "normal",
+              ha="left", va="top", zorder=20, annotation_clip=False)
+    if PANEL_LABEL_XY is not None:
+        xy, coords = tuple(PANEL_LABEL_XY), ax.transAxes
+    elif PANEL_LABEL_POS == "outside":
+        # x from the y-label's own bbox (0 = its left edge), y from the axes
+        xy, coords = (0.0, 1.0), (ax.yaxis.label, ax.transAxes)
+    else:
+        xy, coords = (0.03, 0.97), ax.transAxes
+    ann = Annotation(text, xy=xy, xycoords=coords, **kw)
+    fig.add_artist(ann)
+    ann.anchor_ax = ax            # the GUI converts drags into this axes' fraction
+    ann.set_gid(PANEL_LABEL_GID)
+    try:
+        ann.draggable(True)
+    except Exception:
+        pass          # older matplotlib without draggable support
+    return ann
+
+
+# ----------------------------------------------------------------------
 # Output resolution and figure size, set live by the GUI.
 #   DPI     : dots-per-inch used for every savefig (disk + GUI "Save").
 #   FIGSIZE : (width_in, height_in) override, or None to let each plot
@@ -365,18 +495,80 @@ def prb_stacked(n_panels, double=True):
     return (width, height)
 
 
+# ----------------------------------------------------------------------
+# Journal (fixed-point) sizing.  Once a figure size is set (FIGSIZE, e.g. a
+# PRB preset) text is drawn at these ABSOLUTE point sizes instead of scaling
+# with the figure, and markers / lines / caps use the one FIXED_SCALE.  So
+# every exported figure carries the same type and marker size, however tall
+# or busy it is (scaling made a 3.375 in single panel ~4.9 pt but the
+# triplot ~6.4 pt).  AXIS_FONT_SCALE / LEGEND_FONT_SCALE still multiply on
+# top.  With no size set, each module's own default size and proportional
+# scaling apply, as before.
+#   PAD_IN : whitespace (inches) kept around the content on export.
+# ----------------------------------------------------------------------
+FONT_PT = {"label": 9.0, "tick": 8.0, "legend": 7.5, "panel": 9.0}
+FIXED_SCALE = 0.6
+PAD_IN = 0.02
+
+
+def font_pt(role, base):
+    """Font size for `role` (label / tick / legend / panel).
+
+    Fixed journal points from FONT_PT when a figure size is set, else the
+    module's `base` size times the current SCALE.
+    """
+    return FONT_PT[role] if FIGSIZE else base * SCALE
+
+
 def set_scale(default):
     """Set & return the text/marker scale for the current figure size.
 
     The factor is the geometric mean of the width and height ratios relative
     to `default`, so a figure half as wide and half as tall scales text to
-    half size (not a quarter).  Returns 1.0 when no size override is set.
+    half size (not a quarter).  Returns 1.0 when no size override is set, and
+    FIXED_SCALE (identical for every figure) when one is.
     """
     global SCALE
+    if FIGSIZE:
+        SCALE = FIXED_SCALE
+        return SCALE
     w, h = figsize_in(default)
     dw, dh = default
     SCALE = ((w / dw) * (h / dh)) ** 0.5
     return SCALE
+
+
+def fit_to_size(fig, pad=PAD_IN):
+    """Spread the axes so the drawn content (tick labels, axis labels, legend,
+    panel label) fills the figure to within `pad` inches on every side.
+
+    savefig(bbox_inches="tight") would instead CROP the empty margins, so a
+    3.375 in PRB canvas came out ~3.1 in wide.  Fitting the axes keeps the
+    exported file at exactly FIGSIZE.  Two passes, because widening the axes
+    can change the tick labels.
+    """
+    W, H = fig.get_size_inches()
+    renderer = fig.canvas.get_renderer()
+    for _ in range(2):
+        bb = fig.get_tightbbox(renderer)            # inches
+        sp = fig.subplotpars
+        left = sp.left + (pad - bb.x0) / W
+        right = sp.right + (W - pad - bb.x1) / W
+        bottom = sp.bottom + (pad - bb.y0) / H
+        top = sp.top + (H - pad - bb.y1) / H
+        if not (0 <= left < right <= 1 and 0 <= bottom < top <= 1):
+            return                                  # content can't fit; leave as is
+        fig.subplots_adjust(left=left, right=right, bottom=bottom, top=top)
+
+
+def save_figure(fig, path, dpi=None):
+    """Save `fig`: at exactly FIGSIZE when a size is set, else tight-cropped."""
+    dpi = dpi or DPI
+    if FIGSIZE:
+        fit_to_size(fig)
+        fig.savefig(path, dpi=dpi)
+    else:
+        fig.savefig(path, dpi=dpi, bbox_inches="tight", pad_inches=PAD_IN)
 
 
 def apply_xlim(ax):

@@ -100,9 +100,9 @@ def main(path=None, show=False):
                 markersize=4, label=vc.LABEL["vv0"], zorder=10)
 
     ax.set_ylabel(vc.ylabel_for("V/V0", "$V/V_0$"),
-                  fontsize=12 * s * vc.AXIS_FONT_SCALE)
-    ax.set_xlabel("Pressure (GPa)", fontsize=12 * s * vc.AXIS_FONT_SCALE)
-    ax.tick_params(axis="both", labelsize=10 * s * vc.AXIS_FONT_SCALE)
+                  fontsize=vc.font_pt("label", 12) * vc.AXIS_FONT_SCALE)
+    ax.set_xlabel("Pressure (GPa)", fontsize=vc.font_pt("label", 12) * vc.AXIS_FONT_SCALE)
+    ax.tick_params(axis="both", labelsize=vc.font_pt("tick", 10) * vc.AXIS_FONT_SCALE)
     ax.tick_params(axis="both", which="both", direction="in",
                    top=True, right=True)
     ax.yaxis.set_major_locator(MaxNLocator(nbins=6))
@@ -119,10 +119,11 @@ def main(path=None, show=False):
 
     handles, labels = ax.get_legend_handles_labels()
     if handles:
-        vc.place_legend(ax, handles, labels, 10 * s)
+        vc.place_legend(ax, handles, labels, vc.font_pt("legend", 10))
+    vc.place_panel_label(fig, ax, vc.font_pt("panel", 12))        # "(a)" etc. from the GUI
 
     out = vc.output_path("vv0.png")
-    fig.savefig(out, dpi=vc.DPI, bbox_inches="tight")
+    vc.save_figure(fig, out)
     print(f"V/V0 -> {out}")
     if show:
         plt.show()

@@ -84,9 +84,9 @@ def main(path=None, show=False):
                     label=vc.LABEL[k], key=k)
 
     ax.set_ylabel(vc.ylabel_for(key, ylab),
-                  fontsize=12 * s * vc.AXIS_FONT_SCALE)
-    ax.set_xlabel("Pressure (GPa)", fontsize=12 * s * vc.AXIS_FONT_SCALE)
-    ax.tick_params(axis="both", labelsize=10 * s * vc.AXIS_FONT_SCALE)
+                  fontsize=vc.font_pt("label", 12) * vc.AXIS_FONT_SCALE)
+    ax.set_xlabel("Pressure (GPa)", fontsize=vc.font_pt("label", 12) * vc.AXIS_FONT_SCALE)
+    ax.tick_params(axis="both", labelsize=vc.font_pt("tick", 10) * vc.AXIS_FONT_SCALE)
     ax.tick_params(axis="both", which="both", direction="in",
                    top=True, right=True)
     ax.yaxis.set_major_locator(MaxNLocator(nbins=6))
@@ -95,12 +95,11 @@ def main(path=None, show=False):
     vc.apply_ylim(ax, key)              # GUI-set y bounds (blank => auto)
     vc.apply_xlim(ax)                   # GUI-set x bounds (blank => auto)
 
-    handles, labels = ax.get_legend_handles_labels()
-    if handles:
-        vc.place_legend(ax, handles, labels, 10 * s)
+    vc.draw_legends(fig, [ax], vc.font_pt("legend", 10))   # per vc.LEGEND_MODE
+    vc.place_panel_label(fig, ax, vc.font_pt("panel", 12))        # "(a)" etc. from the GUI
 
     out = vc.output_path("single_element.png")
-    fig.savefig(out, dpi=vc.DPI, bbox_inches="tight")
+    vc.save_figure(fig, out)
     print(f"{key} points -> {out}")
     if show:
         plt.show()

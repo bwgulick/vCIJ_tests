@@ -150,7 +150,19 @@ class VPlotApp(tk.Tk):
         self.leg_x_var = tk.StringVar(value="")
         self.leg_y_var = tk.StringVar(value="")
         self.leg_ncol_var = tk.StringVar(value="auto")
+        # legend layout (combined in panel / shared banner above / lit only)
+        self.leg_mode_var = tk.StringVar(value=next(iter(self._LEG_MODES)))
         self._dragging_legend = False   # True while a legend drag is in flight
+        # panel label ("(a)", "b", ...): text, preset corner, optional pinned
+        # X/Y (top-panel axes fraction, filled by dragging), size multiplier, bold.
+        self.plabel_var = tk.StringVar(value="")
+        self.plabel_pos_var = tk.StringVar(value="Inside top-left")
+        self.plabel_x_var = tk.StringVar(value="")
+        self.plabel_y_var = tk.StringVar(value="")
+        self.plabel_fs_var = tk.StringVar(value="1.0")
+        self.plabel_bold_var = tk.BooleanVar(value=vc.PANEL_LABEL_BOLD)
+        self._dragging_plabel = False   # True while a panel-label drag is in flight
+        self._auto_render_job = None    # pending debounced re-render (after id)
         # widget handles filled in by _build_style_panel
         self.hexvars = {}
         self.swatches = {}
@@ -197,6 +209,8 @@ class VPlotApp(tk.Tk):
         self._build_display_panel(
             self._make_collapsible(left, "Uncertainty (error bars & bands)"))
         self._build_legend_panel(self._make_collapsible(left, "Legend"))
+        self._build_plabel_panel(
+            self._make_collapsible(left, "Panel label (a, b, c ...)"))
         self._build_fonts_panel(
             self._make_collapsible(left, "Fonts (legend & axis text)"))
         self._build_output_panel(
@@ -446,8 +460,15 @@ class VPlotApp(tk.Tk):
         lcb.bind("<<ComboboxSelected>>", lambda e: self._auto_render())
 
     # ------------------------------------------------------------------
-    # legend panel: position (drag or type) + column count
+    # legend panel: layout, position (drag or type) + column count
     # ------------------------------------------------------------------
+    # label -> vc.LEGEND_MODE
+    _LEG_MODES = {
+        "Combined, in panel":           "panel",
+        "Shared banner above figure":   "banner",
+        "Literature only (no shared)":  "lit",
+    }
+
     def _build_legend_panel(self, parent):
         box = ttk.Frame(parent, padding=8)
         box.pack(side=tk.TOP, fill=tk.X)
@@ -455,8 +476,14 @@ class VPlotApp(tk.Tk):
         ttk.Checkbutton(box, text="Show legend",
                         variable=self.legend_show_var,
                         command=lambda: self._toggle_legend()).grid(
-                            row=0, column=0, columnspan=6, padx=6, pady=(0, 4),
+                            row=0, column=0, columnspan=2, padx=6, pady=(0, 4),
                             sticky="w")
+
+        ttk.Label(box, text="Layout:").grid(row=0, column=2, padx=6, pady=(0, 4), sticky="w")
+        mcb = ttk.Combobox(box, textvariable=self.leg_mode_var, width=26,
+                           state="readonly", values=list(self._LEG_MODES))
+        mcb.grid(row=0, column=3, columnspan=3, padx=6, pady=(0, 4), sticky="w")
+        mcb.bind("<<ComboboxSelected>>", lambda e: self._auto_render())
 
         ttk.Label(box, text="X (0-1):").grid(row=1, column=0, padx=6, pady=2, sticky="w")
         xe = ttk.Entry(box, textvariable=self.leg_x_var, width=8)
@@ -496,7 +523,8 @@ class VPlotApp(tk.Tk):
         self._auto_render()
 
     def _collect_legend(self):
-        """Push the legend position + column count into vplot_common."""
+        """Push the legend layout, position + column count into vplot_common."""
+        vc.LEGEND_MODE = self._LEG_MODES.get(self.leg_mode_var.get(), "panel")
         x = self._to_float(self.leg_x_var.get())
         y = self._to_float(self.leg_y_var.get())
         vc.LEGEND_XY = (x, y) if (x is not None and y is not None) else None
@@ -508,6 +536,88 @@ class VPlotApp(tk.Tk):
                 vc.LEGEND_NCOL = max(1, int(float(val)))
             except ValueError:
                 vc.LEGEND_NCOL = None
+
+    # ------------------------------------------------------------------
+    # panel label panel: text + quick a/b/c/d buttons, corner preset,
+    # position (drag or type), size and weight
+    # ------------------------------------------------------------------
+    _PLABEL_POS = {"Inside top-left": "inside", "Outside top-left": "outside"}
+
+    def _build_plabel_panel(self, parent):
+        box = ttk.Frame(parent, padding=8)
+        box.pack(side=tk.TOP, fill=tk.X)
+
+        ttk.Label(box, text="Label:").grid(row=0, column=0, padx=6, pady=2, sticky="w")
+        te = ttk.Entry(box, textvariable=self.plabel_var, width=8)
+        te.grid(row=0, column=1, padx=6, pady=2, sticky="w")
+        quick = ttk.Frame(box)
+        quick.grid(row=0, column=2, columnspan=4, padx=6, pady=2, sticky="w")
+        for txt in ("(a)", "(b)", "(c)", "(d)", "none"):
+            ttk.Button(quick, text=txt, width=5,
+                       command=lambda t=txt: self._set_plabel(t)).pack(side=tk.LEFT)
+
+        ttk.Label(box, text="Corner:").grid(row=1, column=0, padx=6, pady=2, sticky="w")
+        pcb = ttk.Combobox(box, textvariable=self.plabel_pos_var, width=16,
+                           state="readonly", values=list(self._PLABEL_POS))
+        pcb.grid(row=1, column=1, columnspan=2, padx=6, pady=2, sticky="w")
+        pcb.bind("<<ComboboxSelected>>", lambda e: self._reset_plabel())
+
+        ttk.Label(box, text="Size (x):").grid(row=1, column=3, padx=6, pady=2, sticky="w")
+        fsb = ttk.Spinbox(box, from_=0.4, to=4.0, increment=0.1, width=6,
+                          textvariable=self.plabel_fs_var,
+                          command=self._auto_render)
+        fsb.grid(row=1, column=4, padx=6, pady=2, sticky="w")
+        ttk.Checkbutton(box, text="Bold", variable=self.plabel_bold_var,
+                        command=self._auto_render).grid(
+                            row=1, column=5, padx=6, pady=2, sticky="w")
+
+        ttk.Label(box, text="X (0-1):").grid(row=2, column=0, padx=6, pady=2, sticky="w")
+        xe = ttk.Entry(box, textvariable=self.plabel_x_var, width=8)
+        xe.grid(row=2, column=1, padx=6, pady=2, sticky="w")
+        ttk.Label(box, text="Y (0-1):").grid(row=2, column=2, padx=6, pady=2, sticky="w")
+        ye = ttk.Entry(box, textvariable=self.plabel_y_var, width=8)
+        ye.grid(row=2, column=3, padx=6, pady=2, sticky="w")
+        ttk.Button(box, text="Reset position",
+                   command=self._reset_plabel).grid(
+                       row=2, column=4, columnspan=2, padx=6, pady=2, sticky="w")
+
+        ttk.Label(box, text="X/Y = top-panel axes fraction; blank = corner preset; "
+                  "or drag the label on the plot"
+                  ).grid(row=3, column=0, columnspan=6, padx=6, pady=(4, 0), sticky="w")
+
+        for ent in (te, xe, ye, fsb):
+            ent.bind("<Return>",   lambda e: self._auto_render())
+            ent.bind("<FocusOut>", lambda e: self._auto_render())
+
+    def _set_plabel(self, text):
+        """Quick-set button: fill the label text ("none" clears it)."""
+        self.plabel_var.set("" if text == "none" else text)
+        self._auto_render()
+
+    def _reset_plabel(self):
+        """Clear the pinned X/Y so the label snaps back to its corner preset."""
+        self.plabel_x_var.set("")
+        self.plabel_y_var.set("")
+        vc.PANEL_LABEL_XY = None
+        self._auto_render()
+
+    def _collect_plabel(self):
+        """Push the panel label text, position, size and weight into vplot_common."""
+        vc.PANEL_LABEL = self.plabel_var.get()
+        vc.PANEL_LABEL_POS = self._PLABEL_POS.get(self.plabel_pos_var.get(), "inside")
+        x = self._to_float(self.plabel_x_var.get())
+        y = self._to_float(self.plabel_y_var.get())
+        vc.PANEL_LABEL_XY = (x, y) if (x is not None and y is not None) else None
+        vc.PANEL_LABEL_SCALE = self._parse_scale(self.plabel_fs_var)
+        vc.PANEL_LABEL_BOLD = bool(self.plabel_bold_var.get())
+
+    def _find_plabel(self):
+        """Return the current figure's panel-label artist, or None."""
+        if self.current_fig is None:
+            return None
+        found = self.current_fig.findobj(
+            lambda a: a.get_gid() == vc.PANEL_LABEL_GID)
+        return found[0] if found else None
 
     # ------------------------------------------------------------------
     # legend drag: locate the on-canvas legend and read its position back
@@ -534,10 +644,20 @@ class VPlotApp(tk.Tk):
                 return None
 
     def _on_canvas_press(self, event):
-        """Flag a drag only when the press lands on the legend box."""
+        """Flag a drag only when the press lands on the legend box or the
+        panel label (the label wins if they overlap)."""
         self._dragging_legend = False
+        self._dragging_plabel = False
+        if event.x is None:
+            return
+        lab = self._find_plabel()
+        if lab is not None:
+            bbox = self._legend_bbox(lab)
+            if bbox is not None and bbox.contains(event.x, event.y):
+                self._dragging_plabel = True
+                return
         found = self._find_legend()
-        if found is None or event.x is None:
+        if found is None:
             return
         bbox = self._legend_bbox(found[0])
         if bbox is not None and bbox.contains(event.x, event.y):
@@ -545,7 +665,20 @@ class VPlotApp(tk.Tk):
 
     def _on_canvas_release(self, _event):
         """After a legend drag, write its upper-left corner into X/Y (axes
-        fraction) and persist it so the next render keeps the spot."""
+        fraction) and persist it so the next render keeps the spot.  A panel
+        label drag does the same (top-panel axes fraction)."""
+        if self._dragging_plabel:
+            self._dragging_plabel = False
+            lab = self._find_plabel()
+            bbox = self._legend_bbox(lab) if lab is not None else None
+            if bbox is None:
+                return
+            x0, y1 = lab.anchor_ax.transAxes.inverted().transform(
+                (bbox.x0, bbox.y1))
+            self.plabel_x_var.set(f"{x0:.3f}")
+            self.plabel_y_var.set(f"{y1:.3f}")
+            vc.PANEL_LABEL_XY = (float(x0), float(y1))
+            return
         if not self._dragging_legend:
             return
         self._dragging_legend = False
@@ -901,8 +1034,25 @@ class VPlotApp(tk.Tk):
             self.names[key] = val
             self._auto_render()
 
+    _AUTO_RENDER_DELAY_MS = 300
+
     def _auto_render(self):
-        """Re-draw immediately if a figure is already on screen."""
+        """Re-draw (debounced) if a figure is already on screen.
+
+        Each call restarts a short timer, so a burst of changes - e.g. holding
+        a Spinbox arrow, which auto-repeats every ~50 ms - collapses into ONE
+        render once the input settles, instead of queueing a full re-render
+        (and 600-dpi save) per tick and locking up the event loop.
+        """
+        if self.current_fig is None:
+            return
+        if self._auto_render_job is not None:
+            self.after_cancel(self._auto_render_job)
+        self._auto_render_job = self.after(
+            self._AUTO_RENDER_DELAY_MS, self._run_auto_render)
+
+    def _run_auto_render(self):
+        self._auto_render_job = None
         if self.current_fig is not None:
             self.render()
 
@@ -982,6 +1132,7 @@ class VPlotApp(tk.Tk):
         self._collect_bounds()          # push axis bounds into vc.XLIM / vc.YLIM
         self._collect_ylabels()         # push per-panel y-axis labels into vc.YLABEL
         self._collect_legend()          # push legend position + columns into vc
+        self._collect_plabel()          # push panel label ("(a)" ...) into vc
 
         try:
             fig = module.main(path=path, show=False)
@@ -1035,8 +1186,8 @@ class VPlotApp(tk.Tk):
             filetypes=[("PNG", "*.png"), ("PDF", "*.pdf"), ("SVG", "*.svg")],
         )
         if path:
-            self.current_fig.savefig(path, dpi=self._parse_dpi(),
-                                     bbox_inches="tight")
+            # exact FIGSIZE when a size/preset is set, else tight-cropped
+            vc.save_figure(self.current_fig, path, dpi=self._parse_dpi())
             self.status.set(f"Saved -> {os.path.basename(path)}")
 
 
